@@ -1,0 +1,14 @@
+name,description,weight,volume,priority,is_fragile
+Medical Supplies,Emergency medical kit,20,8,5,true
+Food Rations,Long-term storage food,50,30,4,false
+Water Tank,Potable water container,80,40,5,false
+Scientific Equipment,Research instruments,35,15,3,true
+Communication Device,Long-range radio,5,2,4,true
+Solar Panels,Power generation,40,25,3,true
+Spare Parts,Machinery replacements,60,20,2,false
+Tools,Maintenance equipment,25,10,2,false
+Personal Items,Crew belongings,15,12,1,true
+Batteries,Power storage,30,18,3,false
+Oxygen Tanks,Breathable air supply,45,22,5,false
+Plants,Biological experiments,10,8,3,true
+Fuel Cells,Chemical energy storage,55,28,4,false 

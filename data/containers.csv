@@ -1,0 +1,6 @@
+name,width,height,depth,max_weight
+Container A,10,8,6,1000
+Container B,12,10,8,1500
+Container C,8,8,8,800
+Container D,15,12,10,2000
+Container E,6,6,6,500 
