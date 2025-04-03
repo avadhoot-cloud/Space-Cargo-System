@@ -1,88 +1,98 @@
-import React, { useRef, useEffect } from 'react';
-import * as THREE from 'three';
-import { Canvas, useFrame } from 'react-three-fiber';
+import React from 'react';
 import '../styles/ContainerGrid.css';
 
-// A simple box to represent an item
-const Item = ({ position, size, color }) => {
+// Enhanced placeholder component with more visual information
+const ContainerVisualizationPlaceholder = ({ container, items }) => {
+  // Calculate container usage percentage
+  const usedVolume = items.reduce((total, item) => total + (item.volume || 0), 0);
+  const containerVolume = container.width * container.height * container.depth;
+  const usagePercentage = Math.min(Math.round((usedVolume / containerVolume) * 100), 100) || 0;
+  
   return (
-    <mesh position={position}>
-      <boxGeometry args={size} />
-      <meshStandardMaterial color={color} />
-    </mesh>
+    <div className="visualization-placeholder">
+      <div className="placeholder-info">
+        <h3>{container.name} - Space Usage</h3>
+        <div className="usage-bar">
+          <div className="usage-fill" style={{ width: `${usagePercentage}%` }}></div>
+          <span className="usage-text">{usagePercentage}%</span>
+        </div>
+        <div className="container-details">
+          <p><strong>Items:</strong> {items.length}</p>
+          <p><strong>Dimensions:</strong> {container.width}×{container.height}×{container.depth} units</p>
+          <p><strong>Space used:</strong> {usedVolume.toFixed(2)} of {containerVolume.toFixed(2)} cubic units</p>
+        </div>
+      </div>
+    </div>
   );
 };
 
-// Container visualization component
-const ContainerView = ({ container, items }) => {
-  const containerRef = useRef();
-  
-  useFrame(() => {
-    if (containerRef.current) {
-      containerRef.current.rotation.y += 0.005;
-    }
-  });
-  
-  return (
-    <group ref={containerRef}>
-      {/* Container wireframe */}
-      <mesh>
-        <boxGeometry 
-          args={[container.width, container.height, container.depth]} 
-        />
-        <meshStandardMaterial wireframe={true} color="white" />
-      </mesh>
-      
-      {/* Items inside the container */}
-      {items.map((item, index) => {
-        // Calculate size based on volume (simplified as cube for visualization)
-        const size = Math.cbrt(item.volume);
-        const itemSize = [size, size, size];
-        
-        // Calculate position
-        const position = [
-          item.position_x - container.width/2 + size/2,
-          item.position_y - container.height/2 + size/2,
-          item.position_z - container.depth/2 + size/2
-        ];
-        
-        // Generate a color based on item priority
-        const colors = ['#3498db', '#2ecc71', '#f1c40f', '#e67e22', '#e74c3c'];
-        const color = colors[Math.min(item.priority - 1, colors.length - 1)];
-        
-        return (
-          <Item 
-            key={index} 
-            position={position} 
-            size={itemSize} 
-            color={color} 
-          />
-        );
-      })}
-    </group>
-  );
-};
-
-const ContainerGrid = ({ container, items }) => {
+const ContainerGrid = ({ container, items = [] }) => {
   if (!container) {
-    return <div className="container-grid empty">No container selected</div>;
+    return (
+      <div className="empty-message">
+        <h3>No Container Selected</h3>
+        <p>Please select a container to view its details</p>
+      </div>
+    );
   }
   
+  // Calculate weight information
+  const currentWeight = container.current_weight || 0;
+  const maxWeight = container.max_weight || 100;
+  const weightPercentage = Math.min(Math.round((currentWeight / maxWeight) * 100), 100);
+  
+  // Group items by priority
+  const itemsByPriority = items.reduce((acc, item) => {
+    const priority = item.priority || 1;
+    if (!acc[priority]) acc[priority] = [];
+    acc[priority].push(item);
+    return acc;
+  }, {});
+  
   return (
-    <div className="container-grid">
-      <h2>{container.name}</h2>
-      <div className="container-info">
-        <p>Dimensions: {container.width} × {container.height} × {container.depth}</p>
-        <p>Weight: {container.current_weight} / {container.max_weight} kg</p>
-        <p>Items: {items.length}</p>
+    <div className="container-card">
+      <div className="container-header">
+        <h2 className="container-title">{container.name}</h2>
+        <span className="container-id">ID: {container.id || 'N/A'}</span>
       </div>
       
       <div className="container-visualization">
-        <Canvas>
-          <ambientLight intensity={0.5} />
-          <pointLight position={[10, 10, 10]} />
-          <ContainerView container={container} items={items} />
-        </Canvas>
+        <ContainerVisualizationPlaceholder container={container} items={items} />
+      </div>
+      
+      <div className="container-stats">
+        <div className="stat">
+          <span className="stat-value">{items.length}</span>
+          <span className="stat-label">Items</span>
+        </div>
+        <div className="stat">
+          <span className="stat-value">{weightPercentage}%</span>
+          <span className="stat-label">Weight Capacity</span>
+        </div>
+        <div className="stat">
+          <span className="stat-value">{Object.keys(itemsByPriority).length}</span>
+          <span className="stat-label">Priority Groups</span>
+        </div>
+      </div>
+      
+      <div className="container-info">
+        <p>
+          <span>Dimensions</span>
+          <strong>{container.width} × {container.height} × {container.depth}</strong>
+        </p>
+        <p>
+          <span>Weight</span>
+          <strong>{currentWeight} / {maxWeight} kg</strong>
+        </p>
+        <p>
+          <span>Location</span>
+          <strong>{container.location || 'Unspecified'}</strong>
+        </p>
+      </div>
+      
+      <div className="container-actions">
+        <button className="action-button">View Items</button>
+        <button className="action-button primary">Manage</button>
       </div>
     </div>
   );

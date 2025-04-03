@@ -8,7 +8,8 @@ const SearchBar = ({ onSearch }) => {
     isPlaced: null,
     priorityMin: '',
     priorityMax: '',
-    containerId: ''
+    containerId: '',
+    isActive: null
   });
 
   const handleInputChange = (e) => {
@@ -30,7 +31,8 @@ const SearchBar = ({ onSearch }) => {
       isPlaced: null,
       priorityMin: '',
       priorityMax: '',
-      containerId: ''
+      containerId: '',
+      isActive: null
     });
   };
 
@@ -45,7 +47,14 @@ const SearchBar = ({ onSearch }) => {
     };
     
     // Pass search parameters to parent component
-    onSearch(searchParams);
+    if (onSearch) {
+      onSearch(searchParams);
+    }
+  };
+
+  // Helper function to safely convert null to empty string
+  const nullToEmptyString = (value) => {
+    return value === null ? '' : String(value);
   };
 
   return (
@@ -81,7 +90,7 @@ const SearchBar = ({ onSearch }) => {
                 <label>Status:</label>
                 <select 
                   name="isPlaced"
-                  value={filters.isPlaced === null ? '' : filters.isPlaced.toString()}
+                  value={nullToEmptyString(filters.isPlaced)}
                   onChange={(e) => setFilters({
                     ...filters,
                     isPlaced: e.target.value === '' ? null : e.target.value === 'true'
@@ -137,7 +146,7 @@ const SearchBar = ({ onSearch }) => {
               <label>Status:</label>
               <select 
                 name="isActive"
-                value={filters.isActive === null ? '' : filters.isActive.toString()}
+                value={nullToEmptyString(filters.isActive)}
                 onChange={(e) => setFilters({
                   ...filters,
                   isActive: e.target.value === '' ? null : e.target.value === 'true'

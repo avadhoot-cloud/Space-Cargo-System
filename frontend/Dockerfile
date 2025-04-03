@@ -7,8 +7,11 @@ RUN npm install
 
 COPY . .
 
-RUN npm run build
+# Remove production build step - causing issues
+# RUN npm run build
 
 EXPOSE 3000
 
-CMD ["npm", "start"] 
+# Use development mode
+ENV NODE_ENV=development
+CMD ["npm", "start"]
