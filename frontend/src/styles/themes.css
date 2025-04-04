@@ -1,0 +1,78 @@
+/* Theme variables */
+:root {
+  /* Light Theme (default) */
+  --bg-primary: #f8f9fa;
+  --bg-secondary: #ffffff;
+  --text-primary: #2c3e50;
+  --text-secondary: #6c757d;
+  --border-color: #e9ecef;
+  --shadow-color: rgba(0, 0, 0, 0.1);
+  --accent-color: #3498db;
+  --accent-hover: #2980b9;
+  --success-color: #2ecc71;
+  --warning-color: #f39c12;
+  --danger-color: #e74c3c;
+  --card-bg: #ffffff;
+  --input-bg: #ffffff;
+  --input-border: #ced4da;
+  --button-primary-bg: #2c3e50;
+  --button-primary-text: #ffffff;
+  --button-secondary-bg: #e9ecef;
+  --button-secondary-text: #2c3e50;
+  --header-bg: #ffffff;
+  --sidebar-bg: #2c3e50;
+  --sidebar-text: #ecf0f1;
+  --selected-item-bg: #e3f2fd;
+  --hover-bg: #f1f3f5;
+}
+
+/* Dark Theme */
+[data-theme="dark"] {
+  --bg-primary: #1a1a2e;
+  --bg-secondary: #16213e;
+  --text-primary: #e6e6e6;
+  --text-secondary: #b8b8b8;
+  --border-color: #2c3e50;
+  --shadow-color: rgba(0, 0, 0, 0.3);
+  --accent-color: #3498db;
+  --accent-hover: #2980b9;
+  --success-color: #2ecc71;
+  --warning-color: #f39c12;
+  --danger-color: #e74c3c;
+  --card-bg: #16213e;
+  --input-bg: #222f3e;
+  --input-border: #34495e;
+  --button-primary-bg: #3498db;
+  --button-primary-text: #ffffff;
+  --button-secondary-bg: #2c3e50;
+  --button-secondary-text: #ecf0f1;
+  --header-bg: #16213e;
+  --sidebar-bg: #0f3460;
+  --sidebar-text: #ecf0f1;
+  --selected-item-bg: #2c3e50;
+  --hover-bg: #1e3a5f;
+}
+
+/* Apply themes to body */
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Basic element styling */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--text-primary);
+}
+
+p, span, div {
+  color: var(--text-primary);
+}
+
+a {
+  color: var(--accent-color);
+}
+
+a:hover {
+  color: var(--accent-hover);
+} 

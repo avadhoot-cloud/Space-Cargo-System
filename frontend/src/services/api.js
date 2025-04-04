@@ -1,84 +1,76 @@
-import axios from 'axios';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api';
 
-// Create axios instance with base URL
-const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8000/api',
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// API functions for containers
-export const fetchContainers = async (params = {}) => {
+/**
+ * Generic fetch function with error handling
+ */
+async function fetchFromApi(endpoint, options = {}) {
   try {
-    const response = await api.get('/search/containers', { params });
-    return response.data;
+    const response = await fetch(`${API_URL}${endpoint}`, options);
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.detail || `API request failed with status ${response.status}`);
+    }
+    return await response.json();
   } catch (error) {
-    console.error('Error fetching containers:', error);
+    console.error('API fetch error:', error);
     throw error;
   }
-};
+}
 
-export const createContainer = async (containerData) => {
-  try {
-    const response = await api.post('/containers', containerData);
-    return response.data;
-  } catch (error) {
-    console.error('Error creating container:', error);
-    throw error;
+/**
+ * Fetch containers with optional filter parameters
+ */
+export async function fetchContainers(params = {}) {
+  let url = '/upload/containers';
+  
+  // Add query parameters if provided
+  const queryParams = new URLSearchParams();
+  if (params.name) queryParams.append('name', params.name);
+  if (params.is_active !== undefined) queryParams.append('is_active', params.is_active);
+  
+  if (queryParams.toString()) {
+    url += `?${queryParams.toString()}`;
   }
-};
+  
+  return fetchFromApi(url);
+}
 
-// API functions for items
-export const fetchItems = async (params = {}) => {
-  try {
-    const response = await api.get('/search/items', { params });
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching items:', error);
-    throw error;
+/**
+ * Fetch items with optional filter parameters
+ */
+export async function fetchItems(params = {}) {
+  let url = '/upload/items';
+  
+  // Add query parameters if provided
+  const queryParams = new URLSearchParams();
+  if (params.name) queryParams.append('name', params.name);
+  if (params.container_id) queryParams.append('container_id', params.container_id);
+  if (params.is_placed !== undefined) queryParams.append('is_placed', params.is_placed);
+  if (params.priority_min) queryParams.append('priority_min', params.priority_min);
+  if (params.priority_max) queryParams.append('priority_max', params.priority_max);
+  
+  if (queryParams.toString()) {
+    url += `?${queryParams.toString()}`;
   }
-};
+  
+  return fetchFromApi(url);
+}
 
-export const createItem = async (itemData) => {
-  try {
-    const response = await api.post('/items', itemData);
-    return response.data;
-  } catch (error) {
-    console.error('Error creating item:', error);
-    throw error;
-  }
-};
-
-export const placeItem = async (itemId, containerId) => {
-  try {
-    const response = await api.post('/placement/items', {
-      item_id: itemId,
-      container_id: containerId,
-    });
-    return response.data;
-  } catch (error) {
-    console.error('Error placing item:', error);
-    throw error;
-  }
-};
-
-// API function for CSV upload
-export const uploadCSV = async (file, type) => {
+/**
+ * Upload a CSV file
+ */
+export async function uploadCsv(file) {
   const formData = new FormData();
   formData.append('file', file);
   
-  try {
-    const response = await api.post(`/upload/${type}`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-    return response.data;
-  } catch (error) {
-    console.error('Error uploading CSV:', error);
-    throw error;
-  }
-};
+  return fetchFromApi('/upload/csv', {
+    method: 'POST',
+    body: formData,
+  });
+}
 
-export default api; 
+export default {
+  fetchContainers,
+  fetchItems,
+  uploadCsv
+}; 

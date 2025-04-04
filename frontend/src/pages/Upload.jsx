@@ -1,14 +1,19 @@
 import React, { useState } from 'react';
+import { uploadCsv } from '../services/api';
 import '../styles/Upload.css';
 
 function Upload() {
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState('');
+  const [uploadResult, setUploadResult] = useState(null);
+  const [isDuplicate, setIsDuplicate] = useState(false);
   
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
     setMessage('');
+    setUploadResult(null);
+    setIsDuplicate(false);
   };
   
   const handleSubmit = async (e) => {
@@ -19,22 +24,55 @@ function Upload() {
       return;
     }
     
+    // Check file extension
+    if (!file.name.endsWith('.csv')) {
+      setMessage('Only CSV files are allowed');
+      return;
+    }
+    
     setUploading(true);
     setMessage('Uploading file...');
     
-    // Mock upload functionality
-    // In a real app, you would send the file to your API
-    setTimeout(() => {
-      setUploading(false);
-      setMessage('File uploaded successfully!');
+    try {
+      const data = await uploadCsv(file);
+      setMessage(`${data.message}!`);
+      setUploadResult(data);
+      setIsDuplicate(data.duplicate || false);
       setFile(null);
-    }, 2000);
+      
+      // Reset the file input
+      document.getElementById('file-upload').value = '';
+      
+    } catch (error) {
+      setMessage(`Error: ${error.message}`);
+    } finally {
+      setUploading(false);
+    }
   };
   
   return (
     <div className="upload-container">
       <h2>Upload Data</h2>
       <p>Upload container and item data in CSV format</p>
+      
+      <div className="csv-templates">
+        <h3>CSV Templates</h3>
+        <div className="template-info">
+          <div className="template">
+            <h4>Item Template</h4>
+            <pre>item_id,name,width_cm,depth_cm,height_cm,mass_kg,priority,expiry_date,usage_limit,preferred_zone</pre>
+            <p>Example: MED001,Medical Supplies,30,20,15,20,5,2025-12-31,10,A</p>
+          </div>
+          <div className="template">
+            <h4>Container Template</h4>
+            <pre>zone,container_id,width_cm,depth_cm,height_cm</pre>
+            <p>Example: A,Container-001,100,60,80</p>
+          </div>
+        </div>
+        <div className="template-note">
+          <p><strong>Note:</strong> CSV files must include all required headers. Files are stored in the Data folder and checked for duplicates.</p>
+        </div>
+      </div>
       
       <form onSubmit={handleSubmit} className="upload-form">
         <div className="file-input">
@@ -64,8 +102,29 @@ function Upload() {
         </button>
         
         {message && (
-          <div className={`message ${message.includes('successfully') ? 'success' : ''}`}>
+          <div className={`message ${message.includes('!') && !message.includes('Error') ? (isDuplicate ? 'warning' : 'success') : ''}`}>
             {message}
+          </div>
+        )}
+        
+        {uploadResult && (
+          <div className="upload-result">
+            <h3>
+              {isDuplicate 
+                ? 'Duplicate file detected:' 
+                : `Uploaded ${uploadResult.items?.length} ${uploadResult.items?.length === 1 ? 'item' : 'items'}:`}
+            </h3>
+            <ul className="uploaded-items-list">
+              {uploadResult.items && uploadResult.items.map((item, idx) => (
+                <li key={idx}>{item.name}</li>
+              ))}
+              {uploadResult.items && uploadResult.items.length > 5 && (
+                <li>...and {uploadResult.items.length - 5} more</li>
+              )}
+            </ul>
+            {!isDuplicate && uploadResult.file_path && (
+              <p className="file-path">Saved to: {uploadResult.file_path}</p>
+            )}
           </div>
         )}
       </form>

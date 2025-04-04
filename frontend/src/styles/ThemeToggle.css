@@ -1,0 +1,61 @@
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  margin-left: 15px;
+}
+
+.theme-toggle-checkbox {
+  height: 0;
+  width: 0;
+  visibility: hidden;
+  position: absolute;
+}
+
+.theme-toggle-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  width: 50px;
+  height: 24px;
+  background: #2c3e50;
+  border-radius: 100px;
+  position: relative;
+  transition: background-color 0.2s;
+}
+
+.theme-toggle-label .theme-toggle-inner {
+  width: 20px;
+  height: 20px;
+  background: #fff;
+  border-radius: 50%;
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  transition: 0.3s;
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.2);
+}
+
+.theme-toggle-checkbox:checked + .theme-toggle-label {
+  background: #6c5ce7;
+}
+
+.theme-toggle-checkbox:checked + .theme-toggle-label .theme-toggle-inner {
+  left: calc(100% - 2px);
+  transform: translateX(-100%);
+}
+
+.theme-toggle-icon {
+  margin-left: 8px;
+  font-size: 16px;
+}
+
+/* Styles for focus state for accessibility */
+.theme-toggle-checkbox:focus + .theme-toggle-label {
+  box-shadow: 0 0 0 3px rgba(44, 62, 80, 0.3);
+}
+
+.theme-toggle-checkbox:checked:focus + .theme-toggle-label {
+  box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.3);
+} 

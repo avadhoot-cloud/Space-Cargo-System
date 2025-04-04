@@ -1,3 +1,8 @@
+/* ---------------------------------------------------------
+   ContainerGrid Styles
+--------------------------------------------------------- */
+
+/* Grid Layout */
 .container-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
@@ -5,6 +10,7 @@
   margin-top: 20px;
 }
 
+/* Container Card */
 .container-card {
   background-color: #fff;
   border-radius: 12px;
@@ -12,8 +18,8 @@
   padding: 24px;
   display: flex;
   flex-direction: column;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
   overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .container-card:hover {
@@ -21,6 +27,7 @@
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
 }
 
+/* Card Header & Titles */
 .container-header {
   display: flex;
   justify-content: space-between;
@@ -36,13 +43,14 @@
 }
 
 .container-id {
-  color: #7f8c8d;
   font-size: 14px;
+  color: #7f8c8d;
   background: #f5f7fa;
   padding: 4px 8px;
   border-radius: 4px;
 }
 
+/* Statistics Section */
 .container-stats {
   display: flex;
   gap: 20px;
@@ -71,6 +79,7 @@
   margin-top: 4px;
 }
 
+/* Information Block */
 .container-info {
   background: #f8f9fb;
   border-radius: 8px;
@@ -89,6 +98,7 @@
   color: #2c3e50;
 }
 
+/* Action Buttons */
 .container-actions {
   margin-top: auto;
   display: flex;
@@ -121,6 +131,7 @@
   background-color: #1e2c3a;
 }
 
+/* Empty Message */
 .empty-message {
   grid-column: 1 / -1;
   text-align: center;
@@ -131,7 +142,7 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
-/* Visualization placeholder */
+/* Visualization Placeholder */
 .visualization-placeholder {
   height: 240px;
   background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ef 100%);
@@ -150,7 +161,7 @@
 }
 
 .placeholder-info h3 {
-  margin: 0 0 16px 0;
+  margin: 0 0 16px;
   font-size: 18px;
   color: #2c3e50;
 }
@@ -160,6 +171,7 @@
   font-size: 15px;
 }
 
+/* Container Details */
 .container-details {
   margin-top: 20px;
   text-align: left;
@@ -171,7 +183,7 @@
   color: #566573;
 }
 
-/* Usage bar styling */
+/* Usage Bar */
 .usage-bar {
   height: 24px;
   background-color: rgba(0, 0, 0, 0.05);
@@ -201,29 +213,29 @@
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
 
-/* Responsive adjustments */
+/* Responsive Adjustments */
 @media screen and (max-width: 768px) {
   .container-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .container-card {
     padding: 16px;
   }
-  
+
   .container-stats {
     flex-direction: column;
     gap: 10px;
     align-items: flex-start;
   }
-  
+
   .stat {
     flex-direction: row;
     align-items: center;
     gap: 8px;
   }
-  
+
   .stat-label {
     margin-top: 0;
   }
-} 
+}

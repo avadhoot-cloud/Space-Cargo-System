@@ -2,7 +2,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .database import engine
 from . import models
-from .routers import placement, search
+from .routers import placement, search, upload
+import os
+import pathlib
+
+# Ensure data directory exists
+data_dir = pathlib.Path(__file__).parent.parent.parent / "data"
+data_dir.mkdir(exist_ok=True)
 
 # Create database tables
 models.Base.metadata.create_all(bind=engine)
@@ -21,6 +27,7 @@ app.add_middleware(
 # Include routers
 app.include_router(placement.router, prefix="/api/placement", tags=["placement"])
 app.include_router(search.router, prefix="/api/search", tags=["search"])
+app.include_router(upload.router, prefix="/api/upload", tags=["upload"])
 
 @app.get("/")
 def read_root():

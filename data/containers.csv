@@ -1,6 +1,57 @@
-name,width,height,depth,max_weight
-Container A,10,8,6,1000
-Container B,12,10,8,1500
-Container C,8,8,8,800
-Container D,15,12,10,2000
-Container E,6,6,6,500 
+zone,container_id,width_cm,depth_cm,height_cm
+Sanitation_Bay,SB01,25,42.5,200
+Sanitation_Bay,SB02,100,85,200
+Sanitation_Bay,SB03,100,85,200
+Sanitation_Bay,SB04,200,85,200
+Command_Center,CC01,100,85,200
+Command_Center,CC02,100,170,200
+Command_Center,CC03,100,85,200
+Engineering_Bay,EB01,100,85,50
+Engineering_Bay,EB02,25,85,200
+Power_Bay,PB01,100,85,200
+Power_Bay,PB02,200,21.25,100
+Power_Bay,PB03,100,85,200
+Power_Bay,PB04,100,42.5,200
+Power_Bay,PB05,200,85,200
+External_Storage,ES01,100,42.5,50
+External_Storage,ES02,100,42.5,200
+External_Storage,ES03,100,170,200
+External_Storage,ES04,25,85,200
+Lab,L01,100,21.25,400
+Lab,L02,100,85,200
+Lab,L03,100,85,200
+Lab,L04,200,85,200
+Storage_Bay,TA01,100,170,200
+Storage_Bay,TA02,100,85,200
+Storage_Bay,TA03,100,85,50
+Engine_Bay,NA01,200,21.25,200
+Engine_Bay,NA02,100,170,200
+Engine_Bay,NA03,200,85,400
+Life_Support,LS01,25,42.5,200
+Life_Support,LS02,25,85,200
+Life_Support,LS03,100,85,200
+Life_Support,LS04,100,42.5,100
+Life_Support,LS05,100,170,200
+Maintenance_Bay,MB01,100,85,100
+Maintenance_Bay,MB02,100,85,200
+Maintenance_Bay,MB03,50,85,50
+Maintenance_Bay,MB04,100,85,200
+Crew_Quarters,CQ01,50,21.25,400
+Crew_Quarters,CQ02,50,170,200
+Crew_Quarters,CQ03,100,85,200
+Crew_Quarters,CQ04,100,85,200
+Medical_Bay,EA01,100,85,200
+Medical_Bay,EA02,100,21.25,400
+Medical_Bay,EA03,100,85,200
+Cockpit,C01,100,85,200
+Cockpit,C02,50,85,200
+Cockpit,C03,100,85,200
+Cockpit,C04,25,42.5,200
+Cockpit,C05,100,21.25,200
+Airlock,A01,100,170,200
+Airlock,A02,100,85,200
+Airlock,A03,100,170,400
+Greenhouse,G01,200,85,200
+Greenhouse,G02,100,85,400
+Greenhouse,G03,100,85,400
+Greenhouse,G04,100,42.5,200
