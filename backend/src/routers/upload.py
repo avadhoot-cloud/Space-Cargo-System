@@ -142,25 +142,24 @@ def process_records(records: List[Dict[str, Any]], csv_type: str, db: Session):
                 depth=int(data["depth_cm"]),
                 max_weight=1000.0,  # Default value
                 current_weight=0.0,
-                zone=data.get("zone", ""),
                 is_active=True
             )
             db.add(container)
             
     elif csv_type == "item":
         for data in records:
+            # Calculate volume in cubic meters
+            width_cm = float(data["width_cm"])
+            height_cm = float(data["height_cm"])
+            depth_cm = float(data["depth_cm"])
+            volume = width_cm * height_cm * depth_cm / 1000000  # Convert from cm³ to m³
+            
             item = models.Item(
                 name=data["name"],
                 description=data.get("item_id", ""),
                 weight=float(data["mass_kg"]),
-                width=float(data["width_cm"]),
-                height=float(data["height_cm"]),
-                depth=float(data["depth_cm"]),
-                volume=float(data["width_cm"]) * float(data["height_cm"]) * float(data["depth_cm"]) / 1000000,  # Convert to m³
+                volume=volume,
                 priority=int(data["priority"]) if data["priority"] else 1,
-                expiry_date=data.get("expiry_date"),
-                usage_limit=int(data.get("usage_limit", 0)) if data.get("usage_limit") else None,
-                preferred_zone=data.get("preferred_zone"),
                 is_fragile=False  # Default value
             )
             db.add(item)
