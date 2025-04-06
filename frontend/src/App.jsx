@@ -9,6 +9,11 @@ import './styles/themes.css';
 import Dashboard from './pages/Dashboard';
 import Upload from './pages/Upload';
 import Logs from './pages/Logs';
+import Placement from './pages/Placement';
+import ItemSearch from './pages/ItemSearch';
+import Rearrangement from './pages/Rearrangement';
+import WasteManagement from './pages/WasteManagement';
+import TimeSimulation from './pages/TimeSimulation';
 
 // Star field background component
 const StarField = () => {
@@ -90,117 +95,6 @@ const StarField = () => {
   );
 };
 
-// Create placeholders for the new pages
-const PlacementRecommendations = () => (
-  <div className="placeholder-page">
-    <h1>Placement Recommendations</h1>
-    <p>This page will provide automatic suggestions for where to place items based on available space and priority.</p>
-    <div className="feature-cards">
-      <div className="feature-card">
-        <h3>Priority-Based Placement</h3>
-        <p>Automatically suggest optimal placement locations based on item priority and available space.</p>
-      </div>
-      <div className="feature-card">
-        <h3>Space Optimization</h3>
-        <p>If space is insufficient, recommend rearranging existing items to make room.</p>
-      </div>
-      <div className="feature-card">
-        <h3>Accessibility Focus</h3>
-        <p>Ensure high-priority items remain easily accessible and in preferred zones.</p>
-      </div>
-    </div>
-  </div>
-);
-
-const ItemSearch = () => (
-  <div className="placeholder-page">
-    <h1>Item Search & Retrieval</h1>
-    <p>Find items quickly and get optimized retrieval instructions.</p>
-    <div className="feature-cards">
-      <div className="feature-card">
-        <h3>Precise Location</h3>
-        <p>Suggest the exact module and position of the requested item.</p>
-      </div>
-      <div className="feature-card">
-        <h3>Smart Selection</h3>
-        <p>Choose items based on ease of retrieval and closeness to expiry date.</p>
-      </div>
-      <div className="feature-card">
-        <h3>Retrieval Logging</h3>
-        <p>Log retrieval actions including who retrieved the item, when, and from where.</p>
-      </div>
-    </div>
-  </div>
-);
-
-const Rearrangement = () => (
-  <div className="placeholder-page">
-    <h1>Rearrangement Recommendations</h1>
-    <p>Get smart suggestions for reorganizing cargo to maximize space efficiency.</p>
-    <div className="feature-cards">
-      <div className="feature-card">
-        <h3>Relocation Suggestions</h3>
-        <p>Automatically suggest which low-priority items can be relocated when space is insufficient.</p>
-      </div>
-      <div className="feature-card">
-        <h3>Time Optimization</h3>
-        <p>Minimize time spent moving items with efficient rearrangement plans.</p>
-      </div>
-      <div className="feature-card">
-        <h3>Step-by-Step Plans</h3>
-        <p>Show detailed movement plans when rearrangement is necessary.</p>
-      </div>
-    </div>
-  </div>
-);
-
-const WasteManagement = () => (
-  <div className="placeholder-page">
-    <h1>Waste Management & Return Planning</h1>
-    <p>Track expired items and plan for waste disposal during undocking operations.</p>
-    <div className="feature-cards">
-      <div className="feature-card">
-        <h3>Automatic Tracking</h3>
-        <p>Track items that become waste (expired or finished) and mark them for disposal.</p>
-      </div>
-      <div className="feature-card">
-        <h3>Undocking Preparation</h3>
-        <p>Suggest moving all waste to the undocking module while ensuring weight limits are followed.</p>
-      </div>
-      <div className="feature-card">
-        <h3>Manifest Generation</h3>
-        <p>Generate detailed manifests for cargo return during undocking operations.</p>
-      </div>
-    </div>
-  </div>
-);
-
-const TimeSimulation = () => (
-  <div className="placeholder-page">
-    <h1>Time Simulation</h1>
-    <p>Simulate the passage of time to forecast inventory status and plan missions.</p>
-    <div className="feature-cards">
-      <div className="feature-card">
-        <h3>Next Day Simulation</h3>
-        <p>Simulate one day of operations with configurable item usage.</p>
-        <button className="sim-button">Simulate Next Day</button>
-      </div>
-      <div className="feature-card">
-        <h3>Fast Forward</h3>
-        <p>Simulate multiple days at once to see longer-term effects.</p>
-        <div className="sim-control">
-          <input type="number" min="1" max="90" defaultValue="7" className="sim-input" />
-          <button className="sim-button">Fast Forward</button>
-        </div>
-      </div>
-      <div className="feature-card">
-        <h3>Mission Planning</h3>
-        <p>Use time simulation to help with future mission planning and resource allocation.</p>
-      </div>
-    </div>
-  </div>
-);
-
 function App() {
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'light');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -248,35 +142,28 @@ function App() {
                   unchecked: <span aria-hidden>☀️</span>,
                 }}
                 aria-label="Dark mode toggle"
-                className="custom-toggle"
               />
-              <span className="sr-only">Toggle theme</span>
+              <span className="toggle-label">Dark Mode</span>
             </label>
-            <button 
-              className="mobile-toggle" 
-              onClick={toggleMobileMenu}
-              style={{ display: 'none' }}
-            >
-              ☰
+            <button className="mobile-menu-toggle" onClick={toggleMobileMenu}>
+              <span className="menu-icon"></span>
             </button>
           </div>
         </header>
-        
-        <main className="content">
+        <main className="app-main">
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/upload" element={<Upload />} />
-            <Route path="/logs" element={<Logs />} />
-            <Route path="/placement" element={<PlacementRecommendations />} />
+            <Route path="/placement" element={<Placement />} />
             <Route path="/search" element={<ItemSearch />} />
             <Route path="/rearrangement" element={<Rearrangement />} />
             <Route path="/waste" element={<WasteManagement />} />
             <Route path="/simulation" element={<TimeSimulation />} />
+            <Route path="/logs" element={<Logs />} />
           </Routes>
         </main>
-        
         <footer className="app-footer">
-          <p>Space Cargo System &copy; {new Date().getFullYear()}</p>
+          <p>&copy; 2024 Space Cargo System | <a href="#">Documentation</a> | <a href="#">Support</a></p>
         </footer>
       </div>
     </Router>

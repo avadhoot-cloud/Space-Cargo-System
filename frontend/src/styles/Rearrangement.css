@@ -1,0 +1,118 @@
+.rearrangement-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.rearrangement-dashboard {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 20px;
+  margin: 20px 0;
+}
+
+@media (max-width: 768px) {
+  .rearrangement-dashboard {
+    grid-template-columns: 1fr;
+  }
+}
+
+.space-utilization {
+  background-color: var(--card-bg);
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.utilization-chart {
+  margin: 20px 0;
+}
+
+.chart-placeholder {
+  background-color: var(--bg-secondary, #f0f0f0);
+  border-radius: 4px;
+  height: 30px;
+  overflow: hidden;
+}
+
+.chart-bar {
+  height: 100%;
+  background-color: var(--accent-color, #3498db);
+  color: white;
+  text-align: right;
+  padding-right: 10px;
+  line-height: 30px;
+  transition: width 0.5s ease-in-out;
+}
+
+.recommendations-section {
+  background-color: var(--card-bg);
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.action-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.action-card {
+  background-color: var(--bg-secondary);
+  border-radius: 8px;
+  padding: 15px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  transition: transform 0.2s ease-in-out;
+}
+
+.action-card:hover {
+  transform: translateY(-5px);
+}
+
+.action-card h3 {
+  margin-top: 0;
+  color: var(--heading-color);
+}
+
+.action-button {
+  background-color: var(--accent-color, #3498db);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 15px;
+  margin-top: 10px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.action-button:hover {
+  background-color: var(--accent-hover, #2980b9);
+}
+
+.feature-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+  margin-top: 30px;
+}
+
+.feature-card {
+  background-color: var(--card-bg);
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s ease-in-out;
+}
+
+.feature-card:hover {
+  transform: translateY(-5px);
+}
+
+@media (max-width: 768px) {
+  .action-cards,
+  .feature-cards {
+    grid-template-columns: 1fr;
+  }
+} 

@@ -9,8 +9,17 @@ import pathlib
 import shutil
 from typing import List, Dict, Any
 import hashlib
+import logging
 
-router = APIRouter()
+from ..crud import container_crud, item_crud
+
+# Set up logging
+logger = logging.getLogger(__name__)
+
+router = APIRouter(
+    tags=["upload"],
+    responses={404: {"description": "Not found"}}
+)
 
 # Path to data directory relative to the project root
 DATA_DIR = pathlib.Path(__file__).parent.parent.parent.parent / "data"
@@ -165,6 +174,125 @@ def process_records(records: List[Dict[str, Any]], csv_type: str, db: Session):
             db.add(item)
     
     db.commit()
+
+@router.post("/containers")
+async def upload_containers(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Upload containers from a CSV file
+    
+    Expected columns: name, length, width, height, max_weight, zone, priority
+    """
+    logger.info(f"Uploading containers from file: {file.filename}")
+    
+    try:
+        contents = await file.read()
+        contents_str = contents.decode('utf-8')
+        csv_reader = csv.DictReader(io.StringIO(contents_str))
+        
+        containers_created = 0
+        
+        for row in csv_reader:
+            try:
+                container_data = {
+                    "name": row.get("name", ""),
+                    "length": float(row.get("length", 0)),
+                    "width": float(row.get("width", 0)),
+                    "height": float(row.get("height", 0)),
+                    "max_weight": float(row.get("max_weight", 0)),
+                    "zone": row.get("zone", ""),
+                    "priority": int(row.get("priority", 0)),
+                    "used_volume": 0  # Initialize with zero used volume
+                }
+                
+                # Create container
+                container_crud.create_container(db, container_data)
+                containers_created += 1
+                
+            except Exception as e:
+                logger.error(f"Error processing container row: {str(e)}")
+                continue
+        
+        return {"message": f"Successfully imported {containers_created} containers"}
+        
+    except Exception as e:
+        logger.error(f"Error uploading containers: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error uploading containers: {str(e)}")
+
+@router.post("/items")
+async def upload_items(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    """
+    Upload items from a CSV file
+    
+    Expected columns: name, length, width, height, weight, category, priority, zone
+    """
+    logger.info(f"Uploading items from file: {file.filename}")
+    
+    try:
+        contents = await file.read()
+        contents_str = contents.decode('utf-8')
+        csv_reader = csv.DictReader(io.StringIO(contents_str))
+        
+        items_created = 0
+        
+        for row in csv_reader:
+            try:
+                item_data = {
+                    "name": row.get("name", ""),
+                    "length": float(row.get("length", 0)),
+                    "width": float(row.get("width", 0)),
+                    "height": float(row.get("height", 0)),
+                    "weight": float(row.get("weight", 0)),
+                    "category": row.get("category", ""),
+                    "priority": int(row.get("priority", 0)),
+                    "preferred_zone": row.get("zone", ""),
+                    "status": "available"  # Initialize as available
+                }
+                
+                # Create item
+                item_crud.create_item(db, item_data)
+                items_created += 1
+                
+            except Exception as e:
+                logger.error(f"Error processing item row: {str(e)}")
+                continue
+        
+        return {"message": f"Successfully imported {items_created} items"}
+        
+    except Exception as e:
+        logger.error(f"Error uploading items: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error uploading items: {str(e)}")
+
+@router.post("/reset")
+def reset_data(
+    db: Session = Depends(get_db)
+):
+    """
+    Reset all data in the database - remove items and containers
+    """
+    logger.info("Resetting all data")
+    
+    try:
+        # Delete all items
+        db.query(models.Item).delete()
+        
+        # Delete all containers
+        db.query(models.Container).delete()
+        
+        # Commit changes
+        db.commit()
+        
+        return {"message": "All data has been reset"}
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error resetting data: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error resetting data: {str(e)}")
 
 @router.post("/csv", status_code=status.HTTP_201_CREATED)
 async def upload_csv(
