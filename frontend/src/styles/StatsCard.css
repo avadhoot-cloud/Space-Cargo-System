@@ -1,0 +1,212 @@
+.stats-card {
+  background-color: var(--card-bg);
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 10px var(--shadow-color);
+  display: flex;
+  align-items: center;
+  transition: all 0.3s ease;
+  border: 1px solid var(--border-color);
+  position: relative;
+  overflow: hidden;
+  background-image: linear-gradient(
+    135deg,
+    var(--card-bg) 0%,
+    var(--container-gradient-1) 100%
+  );
+}
+
+.stats-card::before {
+  content: '';
+  position: absolute;
+  top: -100%;
+  left: -100%;
+  width: 300%;
+  height: 300%;
+  background: radial-gradient(
+    circle,
+    var(--animate-gradient-1) 0%,
+    var(--animate-gradient-2) 40%,
+    transparent 70%
+  );
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  animation: rotate-slow 15s linear infinite;
+}
+
+@keyframes rotate-slow {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.stats-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 16px var(--shadow-color);
+}
+
+.stats-card:hover::before {
+  opacity: 1;
+}
+
+.stats-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 6px;
+  height: 100%;
+  background-color: var(--accent-color);
+  opacity: 0.8;
+}
+
+.stats-icon {
+  font-size: 2rem;
+  margin-right: 1.2rem;
+  color: var(--accent-color);
+  background-color: var(--bg-secondary);
+  border-radius: 50%;
+  width: 60px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 8px var(--shadow-color);
+  transition: all 0.3s ease;
+  z-index: 1;
+  position: relative;
+}
+
+.stats-card:hover .stats-icon {
+  transform: scale(1.1) rotate(5deg);
+}
+
+.stats-content {
+  flex: 1;
+  position: relative;
+  z-index: 1;
+}
+
+.stats-title {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  margin: 0;
+  margin-bottom: 0.6rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all 0.3s ease;
+}
+
+.stats-value {
+  font-size: 1.8rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  transition: all 0.3s ease;
+  background: linear-gradient(
+    90deg,
+    var(--text-primary),
+    var(--accent-color)
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  position: relative;
+  display: inline-block;
+}
+
+.stats-value::after {
+  content: '';
+  position: absolute;
+  width: 0;
+  height: 2px;
+  bottom: 0;
+  left: 0;
+  background-color: var(--accent-color);
+  transition: width 0.3s ease;
+}
+
+.stats-card:hover .stats-value::after {
+  width: 100%;
+}
+
+.stats-card:nth-child(1) {
+  --accent-color: #2196f3;
+  --animate-gradient-1: rgba(33, 150, 243, 0.1);
+  --animate-gradient-2: rgba(33, 150, 243, 0.02);
+}
+
+.stats-card:nth-child(2) {
+  --accent-color: #4caf50;
+  --animate-gradient-1: rgba(76, 175, 80, 0.1);
+  --animate-gradient-2: rgba(76, 175, 80, 0.02);
+}
+
+.stats-card:nth-child(3) {
+  --accent-color: #ff9800;
+  --animate-gradient-1: rgba(255, 152, 0, 0.1);
+  --animate-gradient-2: rgba(255, 152, 0, 0.02);
+}
+
+.stats-card:nth-child(4) {
+  --accent-color: #e91e63;
+  --animate-gradient-1: rgba(233, 30, 99, 0.1);
+  --animate-gradient-2: rgba(233, 30, 99, 0.02);
+}
+
+[data-theme="dark"] .stats-card:nth-child(1) {
+  --animate-gradient-1: rgba(33, 150, 243, 0.2);
+  --animate-gradient-2: rgba(33, 150, 243, 0.05);
+}
+
+[data-theme="dark"] .stats-card:nth-child(2) {
+  --animate-gradient-1: rgba(76, 175, 80, 0.2);
+  --animate-gradient-2: rgba(76, 175, 80, 0.05);
+}
+
+[data-theme="dark"] .stats-card:nth-child(3) {
+  --animate-gradient-1: rgba(255, 152, 0, 0.2);
+  --animate-gradient-2: rgba(255, 152, 0, 0.05);
+}
+
+[data-theme="dark"] .stats-card:nth-child(4) {
+  --animate-gradient-1: rgba(233, 30, 99, 0.2);
+  --animate-gradient-2: rgba(233, 30, 99, 0.05);
+}
+
+@media (max-width: 768px) {
+  .stats-card {
+    padding: 1rem;
+  }
+  
+  .stats-icon {
+    font-size: 1.5rem;
+    width: 50px;
+    height: 50px;
+    margin-right: 1rem;
+  }
+  
+  .stats-value {
+    font-size: 1.5rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .stats-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 1.2rem;
+  }
+  
+  .stats-title {
+    font-size: 0.8rem;
+  }
+  
+  .stats-value {
+    font-size: 1.3rem;
+  }
+} 

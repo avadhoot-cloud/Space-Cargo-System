@@ -12,7 +12,8 @@ const Navbar = () => {
     <nav className="navbar">
       <div className="navbar-container">
         <Link to="/" className="navbar-logo">
-          Space Cargo System
+          <span className="logo-icon">🚀</span>
+          <span className="logo-text">Space Cargo System</span>
         </Link>
         
         <div className="navbar-menu">
@@ -20,18 +21,23 @@ const Navbar = () => {
             to="/" 
             className={`navbar-item ${location.pathname === '/' ? 'active' : ''}`}
           >
-            Dashboard
+            <span className="navbar-item-icon">📊</span>
+            <span className="navbar-item-text">Dashboard</span>
           </Link>
           <Link 
             to="/upload" 
             className={`navbar-item ${location.pathname === '/upload' ? 'active' : ''}`}
           >
-            Upload
+            <span className="navbar-item-icon">📤</span>
+            <span className="navbar-item-text">Upload</span>
           </Link>
         </div>
         
         <div className="navbar-actions">
-          <ThemeToggle />
+          <div className="theme-toggle-wrapper">
+            <span className="theme-label">{theme === 'light' ? 'Light' : 'Dark'} Mode</span>
+            <ThemeToggle />
+          </div>
         </div>
       </div>
     </nav>

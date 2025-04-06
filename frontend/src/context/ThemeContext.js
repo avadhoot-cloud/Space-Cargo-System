@@ -3,30 +3,26 @@ import React, { createContext, useState, useEffect } from 'react';
 export const ThemeContext = createContext();
 
 export const ThemeProvider = ({ children }) => {
-  // Check if user has a theme preference stored
+  // Retrieve the initial theme: stored value, OS preference, or default to light
   const getInitialTheme = () => {
     const savedTheme = localStorage.getItem('theme');
-    if (savedTheme) {
-      return savedTheme;
-    }
-    // Check for OS/browser preference
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      return 'dark';
-    }
-    return 'light';
+    if (savedTheme) return savedTheme;
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+      ? 'dark'
+      : 'light';
   };
 
   const [theme, setTheme] = useState(getInitialTheme);
 
-  // Update localStorage and document body class when theme changes
+  // Update localStorage and the document's data-theme attribute on theme change
   useEffect(() => {
     localStorage.setItem('theme', theme);
     document.body.setAttribute('data-theme', theme);
   }, [theme]);
 
-  // Toggle between dark and light
+  // Toggle between dark and light themes
   const toggleTheme = () => {
-    setTheme(prevTheme => (prevTheme === 'light' ? 'dark' : 'light'));
+    setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
   };
 
   return (
@@ -36,4 +32,4 @@ export const ThemeProvider = ({ children }) => {
   );
 };
 
-export default ThemeProvider; 
+export default ThemeProvider;

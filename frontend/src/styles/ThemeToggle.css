@@ -3,6 +3,7 @@
   align-items: center;
   cursor: pointer;
   margin-left: 15px;
+  position: relative;
 }
 
 .theme-toggle-checkbox {
@@ -17,45 +18,98 @@
   align-items: center;
   justify-content: space-between;
   cursor: pointer;
-  width: 50px;
-  height: 24px;
-  background: #2c3e50;
+  width: 60px;
+  height: 30px;
+  background: linear-gradient(to right, #f1c40f, #e74c3c);
   border-radius: 100px;
   position: relative;
-  transition: background-color 0.2s;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 5px var(--shadow-color);
+}
+
+[data-theme="dark"] .theme-toggle-label {
+  background: linear-gradient(to right, #2c3e50, #2980b9);
 }
 
 .theme-toggle-label .theme-toggle-inner {
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   background: #fff;
   border-radius: 50%;
   position: absolute;
-  top: 2px;
-  left: 2px;
-  transition: 0.3s;
-  box-shadow: 0 0 2px rgba(0, 0, 0, 0.2);
+  top: 3px;
+  left: 3px;
+  transition: left 0.25s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.theme-toggle-checkbox:checked + .theme-toggle-label {
-  background: #6c5ce7;
+[data-theme="light"] .theme-toggle-label .theme-toggle-inner::before {
+  content: '☀️';
+  font-size: 12px;
+  position: absolute;
 }
 
+[data-theme="dark"] .theme-toggle-label .theme-toggle-inner::before {
+  content: '🌙';
+  font-size: 12px;
+  position: absolute;
+}
+
+/* Move the toggle knob by updating the left position */
 .theme-toggle-checkbox:checked + .theme-toggle-label .theme-toggle-inner {
-  left: calc(100% - 2px);
-  transform: translateX(-100%);
+  left: 33px; /* 60px - 24px - 3px = 33px */
 }
 
 .theme-toggle-icon {
-  margin-left: 8px;
-  font-size: 16px;
+  display: none;
+}
+
+/* Light theme specific styles */
+[data-theme="light"] .theme-toggle-label {
+  border: 1px solid #f1c40f;
+}
+
+/* Dark theme specific styles */
+[data-theme="dark"] .theme-toggle-label {
+  border: 1px solid #2980b9;
+}
+
+/* Hover and focus effects */
+.theme-toggle-label:hover {
+  opacity: 0.9;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px var(--shadow-color);
 }
 
 /* Styles for focus state for accessibility */
 .theme-toggle-checkbox:focus + .theme-toggle-label {
-  box-shadow: 0 0 0 3px rgba(44, 62, 80, 0.3);
+  box-shadow: 0 0 0 3px var(--accent-color);
 }
 
-.theme-toggle-checkbox:checked:focus + .theme-toggle-label {
-  box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.3);
-} 
+/* Responsive styles */
+@media (max-width: 480px) {
+  .theme-toggle-label {
+    width: 50px;
+    height: 24px;
+  }
+  
+  .theme-toggle-label .theme-toggle-inner {
+    width: 18px;
+    height: 18px;
+    top: 3px;
+    left: 3px;
+    transition: left 0.25s cubic-bezier(0.68, -0.55, 0.27, 1.55);
+  }
+  
+  .theme-toggle-checkbox:checked + .theme-toggle-label .theme-toggle-inner {
+    left: calc(100% - 21px); /* Adjusted for smaller container */
+  }
+  
+  [data-theme="light"] .theme-toggle-label .theme-toggle-inner::before,
+  [data-theme="dark"] .theme-toggle-label .theme-toggle-inner::before {
+    font-size: 10px;
+  }
+}

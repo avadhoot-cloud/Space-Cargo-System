@@ -26,7 +26,10 @@ export async function fetchContainers(params = {}) {
   // Add query parameters if provided
   const queryParams = new URLSearchParams();
   if (params.name) queryParams.append('name', params.name);
-  if (params.is_active !== undefined) queryParams.append('is_active', params.is_active);
+  if (params.zone) queryParams.append('zone', params.zone);
+  
+  // Add new fillStatus parameter (full, partially, empty)
+  if (params.fillStatus) queryParams.append('fill_status', params.fillStatus);
   
   if (queryParams.toString()) {
     url += `?${queryParams.toString()}`;
@@ -44,10 +47,13 @@ export async function fetchItems(params = {}) {
   // Add query parameters if provided
   const queryParams = new URLSearchParams();
   if (params.name) queryParams.append('name', params.name);
-  if (params.container_id) queryParams.append('container_id', params.container_id);
-  if (params.is_placed !== undefined) queryParams.append('is_placed', params.is_placed);
-  if (params.priority_min) queryParams.append('priority_min', params.priority_min);
-  if (params.priority_max) queryParams.append('priority_max', params.priority_max);
+  
+  // Single value filters instead of ranges
+  if (params.weight) queryParams.append('weight', params.weight);
+  if (params.priority) queryParams.append('priority', params.priority);
+  if (params.expiryDate) queryParams.append('expiry_date', params.expiryDate);
+  if (params.usageLimit) queryParams.append('usage_limit', params.usageLimit);
+  if (params.preferredZone) queryParams.append('preferred_zone', params.preferredZone);
   
   if (queryParams.toString()) {
     url += `?${queryParams.toString()}`;
