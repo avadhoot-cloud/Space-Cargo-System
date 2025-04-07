@@ -10,24 +10,28 @@ import csv
 import sys
 import pathlib
 import sqlite3
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+import django
 
-# Add the parent directory to sys.path to import from src
-sys.path.append(os.path.abspath(os.path.dirname(__file__)))
-from src.models import Base, Container, Item
-from src.database import engine, get_db, SessionLocal
+# Add Django project to path and set up Django
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'spacecargo.settings')
+django.setup()
+
+# Import Django models after setup
+from placement.models import Container, Item, PlacementHistory
 
 # Path to data directory
 DATA_DIR = pathlib.Path(__file__).parent.parent / "data"
 
 def reset_database():
     """Clear all existing data in the database and recreate tables."""
-    Base.metadata.drop_all(bind=engine)
-    Base.metadata.create_all(bind=engine)
+    # In Django, we'll just delete all records
+    Container.objects.all().delete()
+    Item.objects.all().delete()
+    PlacementHistory.objects.all().delete()
     print("Database reset complete.")
 
-def load_containers(session):
+def load_containers(session=None):
     """Load containers from CSV files in the data folder."""
     container_count = 0
     
@@ -41,14 +45,16 @@ def load_containers(session):
                     # Create container from CSV data - using the correct model attributes
                     container = Container(
                         name=row["container_id"],
-                        width=int(float(row["width_cm"])),
-                        height=int(float(row["height_cm"])),
-                        depth=int(float(row["depth_cm"])),
-                        max_weight=1000.0,  # Default max weight
-                        current_weight=0.0,
-                        is_active=True
+                        width_cm=int(float(row["width_cm"])),
+                        height_cm=int(float(row["height_cm"])),
+                        depth_cm=int(float(row["depth_cm"])),
+                        max_weight_kg=1000.0,  # Default max weight
+                        zone="General",  # Default zone
+                        used_volume=0.0,
+                        used_weight=0.0,
+                        is_full=False
                     )
-                    session.add(container)
+                    container.save()
                     container_count += 1
                 except Exception as e:
                     print(f"Error loading container {row.get('container_id', 'unknown')}: {e}")
@@ -66,14 +72,16 @@ def load_containers(session):
                         # Create container from CSV data - using the correct model attributes
                         container = Container(
                             name=row["container_id"],
-                            width=int(float(row["width_cm"])),
-                            height=int(float(row["height_cm"])),
-                            depth=int(float(row["depth_cm"])),
-                            max_weight=1000.0,  # Default max weight
-                            current_weight=0.0,
-                            is_active=True
+                            width_cm=int(float(row["width_cm"])),
+                            height_cm=int(float(row["height_cm"])),
+                            depth_cm=int(float(row["depth_cm"])),
+                            max_weight_kg=1000.0,  # Default max weight
+                            zone="General",  # Default zone
+                            used_volume=0.0,
+                            used_weight=0.0,
+                            is_full=False
                         )
-                        session.add(container)
+                        container.save()
                         container_count += 1
                         file_container_count += 1
                     except Exception as e:
@@ -81,10 +89,9 @@ def load_containers(session):
                 
                 print(f"Loaded {file_container_count} containers from {file_path}")
     
-    session.commit()
     return container_count
 
-def load_items(session):
+def load_items(session=None):
     """Load items from CSV files in the data folder."""
     item_count = 0
     
@@ -95,25 +102,22 @@ def load_items(session):
             file_item_count = 0
             for row in csv_reader:
                 try:
-                    # Calculate volume in cubic meters
-                    width_cm = float(row["width_cm"])
-                    height_cm = float(row["height_cm"])
-                    depth_cm = float(row["depth_cm"])
-                    volume = width_cm * height_cm * depth_cm / 1000000  # Convert from cm³ to m³
-                    
                     # Default values for optional fields
                     priority = int(row["priority"]) if "priority" in row and row["priority"] and row["priority"] != "N/A" else 1
                     
                     # Create item from CSV data - using the correct field names that match the Item model
                     item = Item(
-                        name=row["name"],
-                        description=row["item_id"],
-                        weight=float(row["mass_kg"]),
-                        volume=volume,
+                        name=row["item_id"],  # Use item_id as the name
+                        width_cm=float(row["width_cm"]),
+                        height_cm=float(row["height_cm"]),
+                        depth_cm=float(row["depth_cm"]),
+                        weight_kg=float(row["mass_kg"]),
                         priority=priority,
-                        is_fragile=False  # Default value
+                        preferred_zone="General",  # Default zone
+                        is_placed=False,
+                        sensitive=False  # Default value
                     )
-                    session.add(item)
+                    item.save()
                     item_count += 1
                     file_item_count += 1
                 except Exception as e:
@@ -121,7 +125,6 @@ def load_items(session):
             
             print(f"Loaded {file_item_count} items from {file_path}")
     
-    session.commit()
     return item_count
 
 def main():
@@ -136,15 +139,12 @@ def main():
     # Reset database (clear existing data)
     reset_database()
     
-    # Create a session
-    session = SessionLocal()
-    
     try:
         # Load containers first
-        container_count = load_containers(session)
+        container_count = load_containers()
         
         # Load items
-        item_count = load_items(session)
+        item_count = load_items()
         
         print(f"\nData loading complete:")
         print(f"- {container_count} containers loaded")
@@ -152,9 +152,6 @@ def main():
         
     except Exception as e:
         print(f"Error loading data: {e}")
-        session.rollback()
-    finally:
-        session.close()
 
 if __name__ == "__main__":
     main() 

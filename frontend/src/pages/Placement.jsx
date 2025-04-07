@@ -1,38 +1,57 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+// frontend/src/pages/Placement.jsx
+
+import React, { useState, useEffect, Suspense } from 'react';
+import apiService from '../services/api';
+import Container3D from '../components/Container3D';
 import '../styles/Placement.css';
 
 const Placement = () => {
   const [placementStats, setPlacementStats] = useState(null);
+  const [placementResults, setPlacementResults] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('statistics');
   const [recommendations, setRecommendations] = useState([]);
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
+  const [selectedContainer, setSelectedContainer] = useState(null);
+  const [containers, setContainers] = useState([]);
+  const [showPlacementModal, setShowPlacementModal] = useState(false);
+  const [placementProcessing, setPlacementProcessing] = useState(false);
 
   useEffect(() => {
-    const fetchPlacementStats = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
-        const apiUrl = `${process.env.REACT_APP_API_URL}/placement/statistics`;
-        const response = await axios.get(apiUrl);
-        setPlacementStats(response.data);
+        const [statsResponse, resultsResponse] = await Promise.all([
+          apiService.placement.getStatistics(),
+          apiService.placement.getResults()
+        ]);
+
+        setPlacementStats(statsResponse.data);
+        setPlacementResults(resultsResponse.data);
+        
+        if (resultsResponse.data?.containers) {
+          setContainers(resultsResponse.data.containers);
+          if (resultsResponse.data.containers.length > 0 && !selectedContainer) {
+            setSelectedContainer(resultsResponse.data.containers[0]);
+          }
+        }
+        
         setLoading(false);
       } catch (err) {
-        console.error('Error fetching placement statistics:', err);
-        setError(`Failed to load placement statistics: ${err.message}`);
+        console.error('Error fetching data:', err);
+        setError(`Failed to load data: ${err.message}`);
         setLoading(false);
       }
     };
 
-    fetchPlacementStats();
+    fetchData();
   }, []);
 
   const fetchRecommendations = async () => {
     try {
       setLoadingRecommendations(true);
-      const apiUrl = `${process.env.REACT_APP_API_URL}/placement/recommendations`;
-      const response = await axios.get(apiUrl);
+      const response = await apiService.placement.getRecommendations();
       setRecommendations(response.data);
       setLoadingRecommendations(false);
     } catch (err) {
@@ -42,26 +61,26 @@ const Placement = () => {
     }
   };
 
-  const handlePlacementAction = async (itemId, containerId, action) => {
+  const handlePlacementAction = async (itemId, containerId) => {
     try {
-      const apiUrl = `${process.env.REACT_APP_API_URL}/placement/place`;
-      const response = await axios.post(apiUrl, {
-        item_id: itemId,
-        container_id: containerId
-      });
+      const response = await apiService.placement.placeItem(itemId, containerId);
 
       if (response.data.success) {
         // Refresh recommendations after successful placement
         fetchRecommendations();
-        // Refresh statistics
-        const statsResponse = await axios.get(`${process.env.REACT_APP_API_URL}/placement/statistics`);
+        // Refresh statistics and results
+        const [statsResponse, resultsResponse] = await Promise.all([
+          apiService.placement.getStatistics(),
+          apiService.placement.getResults()
+        ]);
         setPlacementStats(statsResponse.data);
+        setPlacementResults(resultsResponse.data);
       } else {
-        setError(`Failed to ${action} placement: ${response.data.message}`);
+        setError(`Failed to place item: ${response.data.message}`);
       }
     } catch (err) {
-      console.error(`Error ${action} placement:`, err);
-      setError(`Failed to ${action} placement: ${err.message}`);
+      console.error(`Error placing item:`, err);
+      setError(`Failed to place item: ${err.message}`);
     }
   };
 
@@ -70,6 +89,53 @@ const Placement = () => {
       fetchRecommendations();
     }
   }, [activeTab]);
+
+  // Get items for a specific container
+  const getContainerItems = (containerId) => {
+    if (!placementResults?.placed_items) return [];
+    return placementResults.placed_items.filter(item => item.container_id === containerId);
+  };
+
+  // Get a specific container by ID
+  const getContainerById = (containerId) => {
+    if (!placementResults?.containers) return null;
+    return placementResults.containers.find(c => c.container_id === containerId);
+  };
+
+  const processPlacement = async () => {
+    try {
+      setPlacementProcessing(true);
+      const response = await apiService.placement.processData();
+      
+      if (response.data.success) {
+        // Refresh data after successful processing
+        const [statsResponse, resultsResponse] = await Promise.all([
+          apiService.placement.getStatistics(),
+          apiService.placement.getResults()
+        ]);
+        
+        setPlacementStats(statsResponse.data);
+        setPlacementResults(resultsResponse.data);
+        
+        if (resultsResponse.data?.containers) {
+          setContainers(resultsResponse.data.containers);
+          if (resultsResponse.data.containers.length > 0) {
+            setSelectedContainer(resultsResponse.data.containers[0]);
+          }
+        }
+        
+        // Show success message
+        alert("Placement processing completed successfully!");
+      } else {
+        setError(`Failed to process placement: ${response.data.message}`);
+      }
+    } catch (err) {
+      console.error('Error processing placement:', err);
+      setError(`Failed to process placement: ${err.message}`);
+    } finally {
+      setPlacementProcessing(false);
+    }
+  };
 
   if (loading) return (
     <div className="loading-container">
@@ -112,6 +178,14 @@ const Placement = () => {
             Recommendations
           </button>
         </div>
+        
+        <button 
+          className="process-button"
+          onClick={processPlacement}
+          disabled={placementProcessing}
+        >
+          {placementProcessing ? 'Processing...' : 'Process Placement Data'}
+        </button>
       </div>
       
       {activeTab === 'statistics' && placementStats && (
@@ -121,82 +195,82 @@ const Placement = () => {
             <div className="stat-card">
               <div className="stat-icon">📦</div>
               <h3>Total Items Placed</h3>
-              <p className="stat-value">{placementStats.totalItemsPlaced || 0}</p>
+              <p className="stat-value">{placementResults?.placed_items?.length || 0}</p>
             </div>
             <div className="stat-card">
               <div className="stat-icon">📊</div>
               <h3>Space Utilization</h3>
-              <p className="stat-value">{placementStats.spaceUtilization || 0}%</p>
+              <p className="stat-value">{placementStats.space_utilization.toFixed(1)}%</p>
               <div className="progress-bar">
                 <div 
                   className="progress-fill" 
-                  style={{ width: `${placementStats.spaceUtilization || 0}%` }}
+                  style={{ width: `${placementStats.space_utilization}%` }}
                 ></div>
               </div>
             </div>
             <div className="stat-card">
               <div className="stat-icon">✅</div>
-              <h3>Successful Placements</h3>
-              <p className="stat-value">{placementStats.successRate || 0}%</p>
+              <h3>Success Rate</h3>
+              <p className="stat-value">{placementStats.success_rate.toFixed(1)}%</p>
               <div className="progress-bar">
                 <div 
                   className="progress-fill success" 
-                  style={{ width: `${placementStats.successRate || 0}%` }}
+                  style={{ width: `${placementStats.success_rate}%` }}
                 ></div>
               </div>
             </div>
             <div className="stat-card">
               <div className="stat-icon">⚡</div>
-              <h3>Placement Efficiency</h3>
-              <p className="stat-value">{placementStats.efficiency || 0}%</p>
+              <h3>Overall Efficiency</h3>
+              <p className="stat-value">{placementStats.efficiency.toFixed(1)}%</p>
               <div className="progress-bar">
                 <div 
                   className="progress-fill efficiency" 
-                  style={{ width: `${placementStats.efficiency || 0}%` }}
+                  style={{ width: `${placementStats.efficiency}%` }}
                 ></div>
               </div>
             </div>
-            {placementStats.prioritySatisfaction && (
+            {placementStats.priority_satisfaction && (
               <div className="stat-card">
                 <div className="stat-icon">🔝</div>
                 <h3>Priority Satisfaction</h3>
-                <p className="stat-value">{placementStats.prioritySatisfaction}%</p>
+                <p className="stat-value">{placementStats.priority_satisfaction.toFixed(1)}%</p>
                 <div className="progress-bar">
                   <div 
                     className="progress-fill priority" 
-                    style={{ width: `${placementStats.prioritySatisfaction}%` }}
+                    style={{ width: `${placementStats.priority_satisfaction}%` }}
                   ></div>
                 </div>
               </div>
             )}
-            {placementStats.zoneMatchRate && (
+            {placementStats.zone_match_rate && (
               <div className="stat-card">
                 <div className="stat-icon">🎯</div>
                 <h3>Zone Match Rate</h3>
-                <p className="stat-value">{placementStats.zoneMatchRate}%</p>
+                <p className="stat-value">{placementStats.zone_match_rate.toFixed(1)}%</p>
                 <div className="progress-bar">
                   <div 
                     className="progress-fill zone" 
-                    style={{ width: `${placementStats.zoneMatchRate}%` }}
+                    style={{ width: `${placementStats.zone_match_rate}%` }}
                   ></div>
                 </div>
               </div>
             )}
           </div>
           
-          {placementStats.containerUtilization && placementStats.containerUtilization.length > 0 && (
+          {placementStats.container_utilization && placementStats.container_utilization.length > 0 && (
             <div className="container-utilization">
               <h2>Container Utilization</h2>
               <div className="container-grid">
-                {placementStats.containerUtilization.map((container) => (
+                {placementStats.container_utilization.map((container) => (
                   <div className="container-card" key={container.id}>
-                    <h3>{container.name}</h3>
+                    <h3>{container.name || `Container ${container.id}`}</h3>
                     <div className="utilization-bar-container">
                       <div 
                         className="utilization-bar" 
-                        style={{ height: `${container.utilizationPercentage}%` }}
+                        style={{ height: `${container.utilization_percentage}%` }}
                       >
-                        <span className="utilization-text">{container.utilizationPercentage}%</span>
+                        <span className="utilization-text">{Math.round(container.utilization_percentage)}%</span>
                       </div>
                     </div>
                   </div>
@@ -207,15 +281,52 @@ const Placement = () => {
         </div>
       )}
       
-      {activeTab === 'visualize' && (
+      {activeTab === 'visualize' && placementResults && (
         <div className="visualization-container">
-          <div className="visualization-placeholder">
-            <h3>3D Container Visualization</h3>
-            <p>Interactive visualization of container utilization and item placement</p>
-            <div className="visualization-box">
-              <div className="placeholder-text">3D Visualization coming soon</div>
-            </div>
+          <div className="container-selector">
+            <h3>Select Container</h3>
+            <select 
+              value={selectedContainer?.container_id || ''}
+              onChange={(e) => {
+                const containerId = e.target.value;
+                const container = getContainerById(containerId);
+                setSelectedContainer(container);
+              }}
+            >
+              {containers.map(container => (
+                <option key={container.container_id} value={container.container_id}>
+                  {container.name || `Container ${container.container_id}`} ({container.zone})
+                </option>
+              ))}
+            </select>
           </div>
+          
+          {selectedContainer ? (
+            <div className="container-visualization">
+              <Suspense fallback={<div>Loading 3D view...</div>}>
+                <Container3D 
+                  containerData={selectedContainer}
+                  placedItems={getContainerItems(selectedContainer.container_id)}
+                />
+              </Suspense>
+              
+              <div className="container-info">
+                <h4>Container {selectedContainer.container_id} Contents</h4>
+                <div className="items-list">
+                  {getContainerItems(selectedContainer.container_id).map((item) => (
+                    <div key={item.item_id} className="item-entry">
+                      <span>Item {item.item_id}</span>
+                      <span>Position: ({item.x_cm}, {item.y_cm}, {item.z_cm})</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="visualization-placeholder">
+              <p>No container selected or no containers available.</p>
+            </div>
+          )}
         </div>
       )}
       
@@ -241,13 +352,16 @@ const Placement = () => {
                     <div className="recommendation-actions">
                       <button 
                         className="accept-btn"
-                        onClick={() => handlePlacementAction(recommendation.item_id, recommendation.container_id, 'accept')}
+                        onClick={() => handlePlacementAction(recommendation.item_id, recommendation.container_id)}
                       >
                         Accept
                       </button>
                       <button 
                         className="reject-btn"
-                        onClick={() => handlePlacementAction(recommendation.item_id, null, 'reject')}
+                        onClick={() => {
+                          // Remove this recommendation
+                          setRecommendations(recommendations.filter(r => r.item_id !== recommendation.item_id));
+                        }}
                       >
                         Reject
                       </button>
@@ -264,26 +378,8 @@ const Placement = () => {
           )}
         </div>
       )}
-
-      <div className="feature-cards">
-        <div className="feature-card">
-          <div className="feature-icon">🏆</div>
-          <h3>Priority-Based Placement</h3>
-          <p>Automatically suggest optimal placement locations based on item priority and available space.</p>
-        </div>
-        <div className="feature-card">
-          <div className="feature-icon">🧩</div>
-          <h3>Space Optimization</h3>
-          <p>If space is insufficient, recommend rearranging existing items to make room.</p>
-        </div>
-        <div className="feature-card">
-          <div className="feature-icon">🔍</div>
-          <h3>Accessibility Focus</h3>
-          <p>Ensure high-priority items remain easily accessible and in preferred zones.</p>
-        </div>
-      </div>
     </div>
   );
 };
 
-export default Placement; 
+export default Placement;

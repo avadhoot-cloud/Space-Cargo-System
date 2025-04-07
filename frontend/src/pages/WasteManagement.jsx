@@ -1,13 +1,118 @@
-import React, { useState } from 'react';
+// frontend/src/pages/WasteManagement.jsx
+
+import React, { useState, useEffect } from 'react';
+import apiService from '../services/api';
 import '../styles/WasteManagement.css';
 
 const WasteManagement = () => {
   const [activeTab, setActiveTab] = useState('expired');
+  const [wasteItems, setWasteItems] = useState([]);
+  const [returnPlan, setReturnPlan] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [undockingContainerId, setUndockingContainerId] = useState('');
+  const [maxWeight, setMaxWeight] = useState(1000);
+  const [undockingDate, setUndockingDate] = useState(
+    new Date().toISOString().split('T')[0]
+  );
+  const [containers, setContainers] = useState([]);
+  
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [wasteResponse, containersResponse] = await Promise.all([
+          apiService.waste.identify(),
+          apiService.data.getContainers()
+        ]);
+        
+        setWasteItems(wasteResponse.data.wasteItems || []);
+        setContainers(containersResponse.data || []);
+        
+        // Set default undocking container if available
+        if (containersResponse.data && containersResponse.data.length > 0) {
+          setUndockingContainerId(containersResponse.data[0].container_id);
+        }
+        
+        setLoading(false);
+      } catch (err) {
+        console.error('Error fetching waste data:', err);
+        setError('Failed to load waste data');
+        setLoading(false);
+      }
+    };
+    
+    fetchData();
+  }, []);
+
+  const handleGenerateReturnPlan = async () => {
+    try {
+      if (!undockingContainerId) {
+        setError('Please select an undocking container');
+        return;
+      }
+      
+      setLoading(true);
+      const response = await apiService.waste.returnPlan(
+        undockingContainerId,
+        undockingDate,
+        maxWeight
+      );
+      
+      setReturnPlan(response.data);
+      setActiveTab('undocking');
+      setLoading(false);
+    } catch (err) {
+      console.error('Error generating return plan:', err);
+      setError('Failed to generate return plan');
+      setLoading(false);
+    }
+  };
+
+  const handleCompleteUndocking = async () => {
+    try {
+      if (!undockingContainerId) {
+        setError('Please select an undocking container');
+        return;
+      }
+      
+      setLoading(true);
+      const response = await apiService.waste.completeUndocking(undockingContainerId);
+      
+      if (response.data.success) {
+        // Refresh waste items
+        const wasteResponse = await apiService.waste.identify();
+        setWasteItems(wasteResponse.data.wasteItems || []);
+        
+        alert(`Successfully removed ${response.data.itemsRemoved} waste items`);
+        setReturnPlan(null);
+      }
+      
+      setLoading(false);
+    } catch (err) {
+      console.error('Error completing undocking:', err);
+      setError('Failed to complete undocking');
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="loading-container">
+        <div className="loader"></div>
+        <p>Loading waste management data...</p>
+      </div>
+    );
+  }
   
   return (
     <div className="waste-management-page">
       <h1>Waste Management & Return Planning</h1>
       <p>Track expired items and plan for waste disposal during undocking operations.</p>
+      
+      {error && (
+        <div className="error-message">{error}</div>
+      )}
       
       <div className="waste-tabs">
         <button 
@@ -20,7 +125,7 @@ const WasteManagement = () => {
           className={`tab-button ${activeTab === 'waste' ? 'active' : ''}`} 
           onClick={() => setActiveTab('waste')}
         >
-          Waste Tracking
+          Waste Summary
         </button>
         <button 
           className={`tab-button ${activeTab === 'undocking' ? 'active' : ''}`} 
@@ -34,103 +139,179 @@ const WasteManagement = () => {
         {activeTab === 'expired' && (
           <div className="expired-items-tab">
             <h2>Expired Items</h2>
-            <div className="items-list">
-              <div className="item-row header">
-                <div className="item-col">Item Name</div>
-                <div className="item-col">Location</div>
-                <div className="item-col">Expired On</div>
-                <div className="item-col">Actions</div>
-              </div>
-              <div className="item-row">
-                <div className="item-col">Medical Supplies Kit A</div>
-                <div className="item-col">Module 2, Shelf 3</div>
-                <div className="item-col">March 15, 2024</div>
-                <div className="item-col">
-                  <button className="action-btn">Mark as Waste</button>
+            {wasteItems.length > 0 ? (
+              <div className="items-list">
+                <div className="item-row header">
+                  <div className="item-col">Item Name</div>
+                  <div className="item-col">Item ID</div>
+                  <div className="item-col">Location</div>
+                  <div className="item-col">Reason</div>
                 </div>
+                {wasteItems.map((item) => (
+                  <div className="item-row" key={item.item_id}>
+                    <div className="item-col">{item.name}</div>
+                    <div className="item-col">{item.item_id}</div>
+                    <div className="item-col">Container {item.containerId}</div>
+                    <div className="item-col">{item.reason}</div>
+                  </div>
+                ))}
               </div>
-              <div className="item-row">
-                <div className="item-col">Food Ration Pack C-12</div>
-                <div className="item-col">Module 1, Container 7</div>
-                <div className="item-col">April 1, 2024</div>
-                <div className="item-col">
-                  <button className="action-btn">Mark as Waste</button>
-                </div>
+            ) : (
+              <div className="no-waste-message">
+                <p>No expired or used up items found</p>
               </div>
-            </div>
+            )}
           </div>
         )}
         
         {activeTab === 'waste' && (
           <div className="waste-tracking-tab">
             <h2>Waste Tracking</h2>
-            <div className="waste-summary">
-              <div className="summary-card">
-                <h3>Total Waste</h3>
-                <p className="summary-value">24.5 kg</p>
-              </div>
-              <div className="summary-card">
-                <h3>Waste by Type</h3>
-                <div className="waste-chart">
-                  <div className="chart-bar food" style={{ width: '45%' }}>Food: 45%</div>
-                  <div className="chart-bar medical" style={{ width: '25%' }}>Medical: 25%</div>
-                  <div className="chart-bar packaging" style={{ width: '30%' }}>Packaging: 30%</div>
+            {wasteItems.length > 0 ? (
+              <div className="waste-summary">
+                <div className="summary-card">
+                  <h3>Total Waste Items</h3>
+                  <p className="summary-value">{wasteItems.length}</p>
+                </div>
+                <div className="summary-card">
+                  <h3>Waste by Type</h3>
+                  <div className="waste-chart">
+                    {(() => {
+                      const expiredCount = wasteItems.filter(item => item.reason === 'Expired').length;
+                      const usedUpCount = wasteItems.filter(item => item.reason === 'Out of Uses').length;
+                      const expiredPercentage = (expiredCount / wasteItems.length) * 100;
+                      const usedUpPercentage = (usedUpCount / wasteItems.length) * 100;
+                      
+                      return (
+                        <>
+                          <div className="chart-bar expired" style={{ width: `${expiredPercentage}%` }}>
+                            Expired: {expiredCount} ({expiredPercentage.toFixed(0)}%)
+                          </div>
+                          <div className="chart-bar used-up" style={{ width: `${usedUpPercentage}%` }}>
+                            Out of Uses: {usedUpCount} ({usedUpPercentage.toFixed(0)}%)
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              <div className="no-waste-message">
+                <p>No waste items found</p>
+              </div>
+            )}
+            
+            {wasteItems.length > 0 && (
+              <div className="plan-actions">
+                <button 
+                  className="generate-plan-button"
+                  onClick={handleGenerateReturnPlan}
+                >
+                  Generate Return Plan
+                </button>
+              </div>
+            )}
           </div>
         )}
         
         {activeTab === 'undocking' && (
           <div className="undocking-tab">
             <h2>Undocking Preparation</h2>
-            <div className="undocking-plan">
-              <h3>Next Undocking: May 15, 2024</h3>
-              <div className="plan-steps">
-                <div className="step">
-                  <div className="step-number">1</div>
-                  <div className="step-content">
-                    <h4>Consolidate Waste</h4>
-                    <p>Move all waste items to the return module (Module 6)</p>
-                  </div>
-                </div>
-                <div className="step">
-                  <div className="step-number">2</div>
-                  <div className="step-content">
-                    <h4>Generate Manifest</h4>
-                    <p>Create detailed inventory of return items</p>
-                    <button className="generate-btn">Generate Manifest</button>
-                  </div>
-                </div>
-                <div className="step">
-                  <div className="step-number">3</div>
-                  <div className="step-content">
-                    <h4>Prepare Return Vehicle</h4>
-                    <p>Ensure weight distribution is within parameters</p>
-                  </div>
-                </div>
+            
+            <div className="undocking-form">
+              <div className="form-group">
+                <label>Undocking Container:</label>
+                <select 
+                  value={undockingContainerId} 
+                  onChange={(e) => setUndockingContainerId(e.target.value)}
+                >
+                  <option value="">Select a container</option>
+                  {containers.map(container => (
+                    <option key={container.container_id} value={container.container_id}>
+                      {container.container_id} ({container.zone})
+                    </option>
+                  ))}
+                </select>
               </div>
+              
+              <div className="form-group">
+                <label>Undocking Date:</label>
+                <input 
+                  type="date" 
+                  value={undockingDate} 
+                  onChange={(e) => setUndockingDate(e.target.value)}
+                />
+              </div>
+              
+              <div className="form-group">
+                <label>Max Weight (kg):</label>
+                <input 
+                  type="number" 
+                  value={maxWeight} 
+                  onChange={(e) => setMaxWeight(e.target.value)}
+                  min="1"
+                  step="0.1"
+                />
+              </div>
+              
+              <button 
+                className="generate-btn"
+                onClick={handleGenerateReturnPlan}
+              >
+                Generate Return Plan
+              </button>
             </div>
+            
+            {returnPlan && (
+              <div className="return-plan-results">
+                <h3>Return Plan for {returnPlan.returnManifest.undockingDate}</h3>
+                
+                <div className="return-summary">
+                  <div className="summary-item">
+                    <span>Total Items:</span>
+                    <span>{returnPlan.returnManifest.returnItems.length}</span>
+                  </div>
+                  <div className="summary-item">
+                    <span>Total Weight:</span>
+                    <span>{returnPlan.returnManifest.totalWeight.toFixed(2)} kg</span>
+                  </div>
+                  <div className="summary-item">
+                    <span>Total Volume:</span>
+                    <span>{returnPlan.returnManifest.totalVolume.toFixed(2)} cm³</span>
+                  </div>
+                </div>
+                
+                {returnPlan.returnPlan.length > 0 ? (
+                  <div className="return-steps">
+                    <h4>Return Plan Steps:</h4>
+                    <ol>
+                      {returnPlan.returnPlan.map((step, index) => (
+                        <li key={index}>
+                          Move {step.itemName} from Container {step.fromContainer} to Container {step.toContainer}
+                        </li>
+                      ))}
+                    </ol>
+                    
+                    <button 
+                      className="complete-undocking-btn"
+                      onClick={handleCompleteUndocking}
+                    >
+                      Complete Undocking
+                    </button>
+                  </div>
+                ) : (
+                  <div className="no-return-items">
+                    <p>No items to return</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
-      </div>
-      
-      <div className="feature-cards">
-        <div className="feature-card">
-          <h3>Automatic Tracking</h3>
-          <p>Track items that become waste (expired or finished) and mark them for disposal.</p>
-        </div>
-        <div className="feature-card">
-          <h3>Undocking Preparation</h3>
-          <p>Suggest moving all waste to the undocking module while ensuring weight limits are followed.</p>
-        </div>
-        <div className="feature-card">
-          <h3>Manifest Generation</h3>
-          <p>Generate detailed manifests for cargo return during undocking operations.</p>
-        </div>
       </div>
     </div>
   );
 };
 
-export default WasteManagement; 
+export default WasteManagement;

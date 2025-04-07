@@ -1,9 +1,12 @@
+// frontend/src/pages/Upload.jsx
+
 import React, { useState, useRef } from 'react';
-import { uploadCsv } from '../services/api';
+import apiService from '../services/api';
 import '../styles/Upload.css';
 
 function Upload() {
   const [file, setFile] = useState(null);
+  const [fileType, setFileType] = useState('items'); // 'items' or 'containers'
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState('');
   const [uploadResult, setUploadResult] = useState(null);
@@ -59,9 +62,19 @@ function Upload() {
     setUploading(true);
     setMessage('Uploading file...');
     
+    const formData = new FormData();
+    formData.append('file', file);
+    
     try {
-      const data = await uploadCsv(file);
-      setMessage(`${data.message}!`);
+      let response;
+      if (fileType === 'items') {
+        response = await apiService.data.importItems(formData);
+      } else {
+        response = await apiService.data.importContainers(formData);
+      }
+      
+      const data = response.data;
+      setMessage(`${data.message || 'Upload successful'}!`);
       setUploadResult(data);
       setIsDuplicate(data.duplicate || false);
       setFile(null);
@@ -72,7 +85,7 @@ function Upload() {
       }
       
     } catch (error) {
-      setMessage(`Error: ${error.message}`);
+      setMessage(`Error: ${error.response?.data?.message || error.message}`);
     } finally {
       setUploading(false);
     }
@@ -89,14 +102,14 @@ function Upload() {
           <div className="template">
             <h4>Item Template</h4>
             <pre>item_id,name,width_cm,depth_cm,height_cm,mass_kg,priority,expiry_date,usage_limit,preferred_zone</pre>
-            <p>Example: MED001,Medical Supplies,30,20,15,20,5,2025-12-31,10,A</p>
-            <p>Required fields: item_id, name, width_cm, depth_cm, height_cm, mass_kg, priority</p>
+            <p>Example: MED001,Medical Supplies,30,20,15,20,5,2025-12-31,10,Medical_Bay</p>
+            <p>Required fields: item_id, name, width_cm, depth_cm, height_cm</p>
           </div>
           <div className="template">
             <h4>Container Template</h4>
             <pre>zone,container_id,width_cm,depth_cm,height_cm</pre>
-            <p>Example: A,Container-001,100,60,80</p>
-            <p>Required fields: container_id, width_cm, depth_cm, height_cm</p>
+            <p>Example: Medical_Bay,MB01,100,60,80</p>
+            <p>Required fields: container_id, width_cm, depth_cm, height_cm, zone</p>
           </div>
         </div>
         <div className="template-note">
@@ -105,6 +118,27 @@ function Upload() {
       </div>
       
       <form onSubmit={handleSubmit} className="upload-form">
+        <div className="file-type-selector">
+          <label>
+            <input
+              type="radio"
+              value="items"
+              checked={fileType === 'items'}
+              onChange={() => setFileType('items')}
+            />
+            Items
+          </label>
+          <label>
+            <input
+              type="radio"
+              value="containers"
+              checked={fileType === 'containers'}
+              onChange={() => setFileType('containers')}
+            />
+            Containers
+          </label>
+        </div>
+        
         <div className="file-input">
           <label htmlFor="file-upload">Select CSV File</label>
           <div 
@@ -133,7 +167,7 @@ function Upload() {
             <div className="file-info-content">
               <p>Selected file: {file.name}</p>
               <p>Size: {(file.size / 1024).toFixed(2)} KB</p>
-              <p>Last modified: {new Date(file.lastModified).toLocaleString()}</p>
+              <p>Type: {fileType === 'items' ? 'Items' : 'Containers'} CSV</p>
             </div>
           </div>
         )}
@@ -147,7 +181,7 @@ function Upload() {
         </button>
         
         {message && (
-          <div className={`message ${message.includes('!') && !message.includes('Error') ? (isDuplicate ? 'warning' : 'success') : ''}`}>
+          <div className={`message ${message.includes('!') && !message.includes('Error') ? (isDuplicate ? 'warning' : 'success') : 'error'}`}>
             {message}
           </div>
         )}
@@ -156,19 +190,14 @@ function Upload() {
           <div className="upload-result">
             <h3>
               {isDuplicate 
-                ? 'Duplicate file detected:' 
-                : `Uploaded ${uploadResult.items?.length} ${uploadResult.items?.length === 1 ? 'item' : 'items'}:`}
+                ? 'Duplicate file detected' 
+                : `${fileType === 'items' ? 'Items' : 'Containers'} uploaded successfully`}
             </h3>
-            <ul className="uploaded-items-list">
-              {uploadResult.items && uploadResult.items.slice(0, 5).map((item, idx) => (
-                <li key={idx}>{item.name}</li>
-              ))}
-              {uploadResult.items && uploadResult.items.length > 5 && (
-                <li>...and {uploadResult.items.length - 5} more</li>
-              )}
-            </ul>
-            {!isDuplicate && uploadResult.file_path && (
-              <p className="file-path">Saved to: {uploadResult.file_path}</p>
+            {uploadResult.itemsImported && (
+              <p>{uploadResult.itemsImported} items imported</p>
+            )}
+            {uploadResult.containersImported && (
+              <p>{uploadResult.containersImported} containers imported</p>
             )}
           </div>
         )}
@@ -177,4 +206,4 @@ function Upload() {
   );
 }
 
-export default Upload; 
+export default Upload;

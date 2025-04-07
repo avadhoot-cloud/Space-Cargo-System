@@ -1,12 +1,30 @@
-import React, { useState } from 'react';
-import axios from 'axios';
+// frontend/src/pages/ItemSearch.jsx
+
+import React, { useState, useEffect } from 'react';
+import apiService from '../services/api';
 import '../styles/ItemSearch.css';
 
 const ItemSearch = () => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchResults, setSearchResults] = useState([]);
+  const [searchResults, setSearchResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [retrieving, setRetrieving] = useState(false);
+  const [items, setItems] = useState([]);
+
+  useEffect(() => {
+    // Load all items on component mount
+    const fetchItems = async () => {
+      try {
+        const response = await apiService.data.getItems();
+        setItems(response.data);
+      } catch (err) {
+        console.error('Error loading items:', err);
+      }
+    };
+    
+    fetchItems();
+  }, []);
 
   const handleSearch = async (e) => {
     e.preventDefault();
@@ -15,17 +33,40 @@ const ItemSearch = () => {
     try {
       setLoading(true);
       setError(null);
-      // Debug API URL
-      const apiUrl = `${process.env.REACT_APP_API_URL}/search/items?query=${searchTerm}`;
-      console.log('Search API URL:', apiUrl);
       
-      const response = await axios.get(apiUrl);
+      // Try to find by ID first, then by name
+      const response = await apiService.search.findItem(
+        searchTerm.includes('-') ? searchTerm : null, 
+        !searchTerm.includes('-') ? searchTerm : null
+      );
+      
       setSearchResults(response.data);
       setLoading(false);
     } catch (err) {
       console.error('Error searching items:', err);
       setError('Failed to search for items');
       setLoading(false);
+    }
+  };
+
+  const handleRetrieve = async (itemId) => {
+    try {
+      setRetrieving(true);
+      await apiService.search.retrieveItem(itemId);
+      alert(`Item ${itemId} has been retrieved successfully`);
+      
+      // Refresh search results
+      const response = await apiService.search.findItem(
+        itemId,
+        null
+      );
+      
+      setSearchResults(response.data);
+      setRetrieving(false);
+    } catch (err) {
+      console.error('Error retrieving item:', err);
+      setError('Failed to retrieve item');
+      setRetrieving(false);
     }
   };
 
@@ -41,7 +82,7 @@ const ItemSearch = () => {
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search for items..."
+              placeholder="Search for items by ID or name..."
               className="search-input"
             />
             <button type="submit" className="search-button" disabled={loading}>
@@ -52,44 +93,74 @@ const ItemSearch = () => {
         
         {error && <div className="error-message">{error}</div>}
         
-        {searchResults.length > 0 ? (
+        {searchResults && searchResults.found ? (
           <div className="search-results">
             <h2>Search Results</h2>
-            <div className="results-list">
-              {searchResults.map((item) => (
-                <div key={item.id} className="result-item">
-                  <h3>{item.name}</h3>
-                  <div className="item-details">
-                    <p><strong>Location:</strong> Module {item.container.module}, Position ({item.position_x}, {item.position_y}, {item.position_z})</p>
-                    <p><strong>Priority:</strong> {item.priority}</p>
-                    <p><strong>Weight:</strong> {item.weight} kg</p>
-                    {item.expiry_date && <p><strong>Expires:</strong> {new Date(item.expiry_date).toLocaleDateString()}</p>}
-                  </div>
+            <div className="item-details-card">
+              <h3>{searchResults.item.name} ({searchResults.item.itemId})</h3>
+              
+              <div className="item-location-info">
+                {searchResults.item.containerId ? (
+                  <>
+                    <p><strong>Location:</strong> Container {searchResults.item.containerId}</p>
+                    <p><strong>Position:</strong> ({searchResults.item.position.startCoordinates.width}, {searchResults.item.position.startCoordinates.depth}, {searchResults.item.position.startCoordinates.height})</p>
+                    <div className="retrieval-button-container">
+                      <button 
+                        className="retrieve-button"
+                        onClick={() => handleRetrieve(searchResults.item.itemId)}
+                        disabled={retrieving}
+                      >
+                        {retrieving ? 'Retrieving...' : 'Retrieve Item'}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <p><strong>Status:</strong> Item not currently placed in any container</p>
+                )}
+              </div>
+              
+              {searchResults.retrievalSteps && searchResults.retrievalSteps.length > 0 && (
+                <div className="retrieval-steps">
+                  <h4>Retrieval Steps:</h4>
+                  <ol>
+                    {searchResults.retrievalSteps.map((step, index) => (
+                      <li key={index}>
+                        {step.action === 'retrieve' ? 'Retrieve item directly' : step.action} {step.itemName}
+                      </li>
+                    ))}
+                  </ol>
                 </div>
-              ))}
+              )}
             </div>
           </div>
         ) : (
-          !loading && searchTerm && <p className="no-results">No items found matching your search.</p>
+          searchResults && !searchResults.found && (
+            <p className="no-results">No items found matching your search.</p>
+          )
         )}
-      </div>
-
-      <div className="feature-cards">
-        <div className="feature-card">
-          <h3>Precise Location</h3>
-          <p>Suggest the exact module and position of the requested item.</p>
-        </div>
-        <div className="feature-card">
-          <h3>Smart Selection</h3>
-          <p>Choose items based on ease of retrieval and closeness to expiry date.</p>
-        </div>
-        <div className="feature-card">
-          <h3>Retrieval Logging</h3>
-          <p>Log retrieval actions including who retrieved the item, when, and from where.</p>
-        </div>
+        
+        {!searchResults && !loading && (
+          <div className="browse-items">
+            <h3>Browse All Items</h3>
+            <div className="items-grid">
+              {items.slice(0, 10).map(item => (
+                <div key={item.item_id} className="item-card" onClick={() => setSearchTerm(item.item_id)}>
+                  <h4>{item.name}</h4>
+                  <p>ID: {item.item_id}</p>
+                  {item.preferred_zone && <p>Zone: {item.preferred_zone}</p>}
+                </div>
+              ))}
+              {items.length > 10 && (
+                <div className="more-items">
+                  + {items.length - 10} more items
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
 };
 
-export default ItemSearch; 
+export default ItemSearch;

@@ -90,7 +90,7 @@ def pack_items(items_df, containers_df):
                 container['depth_cm'],
                 container['max_weight_kg']
             )
-            packer.addBin(bin_obj)
+            packer.add_bin(bin_obj)
         
         # Add items to packer
         for _, item in zone_items.iterrows():
@@ -107,7 +107,7 @@ def pack_items(items_df, containers_df):
             item_obj.level = item['priority']
             item_obj.put_type = 1  # if needed for later use
             item_obj.color = 'red' if item['sensitive'] else 'green'
-            packer.addItem(item_obj)
+            packer.add_item(item_obj)
         
         # Pack items
         packer.pack(bigger_first=True, distribute_items=False, fix_point=True)
@@ -145,7 +145,7 @@ def pack_items(items_df, containers_df):
                 container['depth_cm'],
                 container['max_weight_kg']
             )
-            packer.addBin(bin_obj)
+            packer.add_bin(bin_obj)
         
         for _, item in remaining_items.iterrows():
             item_obj = Item(
@@ -159,7 +159,7 @@ def pack_items(items_df, containers_df):
             item_obj.level = item['priority']
             item_obj.put_type = 1
             item_obj.color = 'red' if item['sensitive'] else 'green'
-            packer.addItem(item_obj)
+            packer.add_item(item_obj)
         
         packer.pack(bigger_first=True, distribute_items=False, fix_point=True)
         
@@ -210,7 +210,7 @@ def generate_output(placed_df, unplaced_df):
     print(f"🚫 Failed to place: {len(unplaced_df)} items")
     print(f"📊 Placement rate: {len(placed_df)/(len(placed_df)+len(unplaced_df)):.1%}")
 
-if _name_ == "_main_":
+if __name__ == "__main__":
     # Load and preprocess data
     items_df, containers_df = load_and_preprocess_data('input_items.csv', 'containers.csv')
     

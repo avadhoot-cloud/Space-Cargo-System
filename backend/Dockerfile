@@ -1,21 +1,32 @@
-FROM python:3.9-slim
+# Start from Ubuntu:22.04 as the base image
+FROM ubuntu:22.04
 
+# Set environment variables to avoid interactive prompts during installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Update package lists and install Python and pip
+RUN apt-get update && \
+    apt-get install -y python3 python3-pip libsm6 libxext6 libxrender-dev && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Set working directory inside the container
 WORKDIR /app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy requirements first to leverage Docker cache
+# Copy requirements file
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application
+# Install Python dependencies
+RUN pip3 install --no-cache-dir -r requirements.txt
+
+# Copy the rest of the application code
 COPY . .
 
-# Expose the port the app runs on
+# Create the data directory
+RUN mkdir -p /data
+
+# Expose port 8000 to the outside world
 EXPOSE 8000
 
-# Command to run the application
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000"] 
+# Command to run the Python application
+CMD ["uvicorn", "placement.wsgi:application", "--host", "0.0.0.0", "--port", "8000"]
