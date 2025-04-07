@@ -7,17 +7,15 @@ const Placement = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('statistics');
+  const [recommendations, setRecommendations] = useState([]);
+  const [loadingRecommendations, setLoadingRecommendations] = useState(false);
 
   useEffect(() => {
     const fetchPlacementStats = async () => {
       try {
         setLoading(true);
-        // Log the API URL for debugging
         const apiUrl = `${process.env.REACT_APP_API_URL}/placement/statistics`;
-        console.log('Fetching placement statistics from:', apiUrl);
-        
         const response = await axios.get(apiUrl);
-        console.log('Received placement statistics:', response.data);
         setPlacementStats(response.data);
         setLoading(false);
       } catch (err) {
@@ -29,6 +27,49 @@ const Placement = () => {
 
     fetchPlacementStats();
   }, []);
+
+  const fetchRecommendations = async () => {
+    try {
+      setLoadingRecommendations(true);
+      const apiUrl = `${process.env.REACT_APP_API_URL}/placement/recommendations`;
+      const response = await axios.get(apiUrl);
+      setRecommendations(response.data);
+      setLoadingRecommendations(false);
+    } catch (err) {
+      console.error('Error fetching recommendations:', err);
+      setError(`Failed to load recommendations: ${err.message}`);
+      setLoadingRecommendations(false);
+    }
+  };
+
+  const handlePlacementAction = async (itemId, containerId, action) => {
+    try {
+      const apiUrl = `${process.env.REACT_APP_API_URL}/placement/place`;
+      const response = await axios.post(apiUrl, {
+        item_id: itemId,
+        container_id: containerId
+      });
+
+      if (response.data.success) {
+        // Refresh recommendations after successful placement
+        fetchRecommendations();
+        // Refresh statistics
+        const statsResponse = await axios.get(`${process.env.REACT_APP_API_URL}/placement/statistics`);
+        setPlacementStats(statsResponse.data);
+      } else {
+        setError(`Failed to ${action} placement: ${response.data.message}`);
+      }
+    } catch (err) {
+      console.error(`Error ${action} placement:`, err);
+      setError(`Failed to ${action} placement: ${err.message}`);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'recommendations') {
+      fetchRecommendations();
+    }
+  }, [activeTab]);
 
   if (loading) return (
     <div className="loading-container">
@@ -143,7 +184,6 @@ const Placement = () => {
             )}
           </div>
           
-          {/* Container Utilization Section */}
           {placementStats.containerUtilization && placementStats.containerUtilization.length > 0 && (
             <div className="container-utilization">
               <h2>Container Utilization</h2>
@@ -184,33 +224,44 @@ const Placement = () => {
           <h3>Placement Recommendations</h3>
           <p>Optimized recommendations for placing new items</p>
           
-          <div className="recommendation-list">
-            <div className="recommendation-item">
-              <div className="recommendation-icon">📦</div>
-              <div className="recommendation-content">
-                <h4>Item: Science Equipment Box</h4>
-                <p>Suggested container: <strong>Storage Module Alpha, Section B-2</strong></p>
-                <p>Reasoning: Best space utilization and priority matching</p>
-                <div className="recommendation-actions">
-                  <button className="accept-btn">Accept</button>
-                  <button className="reject-btn">Reject</button>
-                </div>
-              </div>
+          {loadingRecommendations ? (
+            <div className="loading-container">
+              <div className="loader"></div>
+              <p>Loading recommendations...</p>
             </div>
-            
-            <div className="recommendation-item">
-              <div className="recommendation-icon">🧪</div>
-              <div className="recommendation-content">
-                <h4>Item: Lab Supplies</h4>
-                <p>Suggested container: <strong>Lab Module, Section L-5</strong></p>
-                <p>Reasoning: Zone matching and accessibility optimization</p>
-                <div className="recommendation-actions">
-                  <button className="accept-btn">Accept</button>
-                  <button className="reject-btn">Reject</button>
+          ) : (
+            <div className="recommendation-list">
+              {recommendations.map((recommendation) => (
+                <div className="recommendation-item" key={recommendation.item_id}>
+                  <div className="recommendation-icon">📦</div>
+                  <div className="recommendation-content">
+                    <h4>Item: {recommendation.item_name}</h4>
+                    <p>Suggested container: <strong>{recommendation.container_name}</strong></p>
+                    <p>Reasoning: {recommendation.reasoning}</p>
+                    <div className="recommendation-actions">
+                      <button 
+                        className="accept-btn"
+                        onClick={() => handlePlacementAction(recommendation.item_id, recommendation.container_id, 'accept')}
+                      >
+                        Accept
+                      </button>
+                      <button 
+                        className="reject-btn"
+                        onClick={() => handlePlacementAction(recommendation.item_id, null, 'reject')}
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              ))}
+              {recommendations.length === 0 && (
+                <div className="no-recommendations">
+                  <p>No placement recommendations available at this time.</p>
+                </div>
+              )}
             </div>
-          </div>
+          )}
         </div>
       )}
 

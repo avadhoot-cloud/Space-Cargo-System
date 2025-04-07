@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, NavLink } from 'react-router-dom';
-import Toggle from 'react-toggle';
-import "react-toggle/style.css";
+import ThemeToggle from './components/ThemeToggle';
 import './styles/App.css';
 import './styles/themes.css';
 
@@ -104,8 +103,8 @@ function App() {
     localStorage.setItem('theme', theme);
   }, [theme]);
 
-  const handleThemeChange = (e) => {
-    setTheme(e.target.checked ? 'dark' : 'light');
+  const toggleTheme = () => {
+    setTheme(theme === 'light' ? 'dark' : 'light');
   };
 
   const toggleMobileMenu = () => {
@@ -132,25 +131,18 @@ function App() {
               <li><NavLink to="/logs">Logs</NavLink></li>
             </ul>
           </nav>
-          <div className="app-controls">
-            <label className="theme-toggle-wrapper">
-              <Toggle
-                checked={theme === 'dark'}
-                onChange={handleThemeChange}
-                icons={{
-                  checked: <span aria-hidden>🌙</span>,
-                  unchecked: <span aria-hidden>☀️</span>,
-                }}
-                aria-label="Dark mode toggle"
-              />
-              <span className="toggle-label">Dark Mode</span>
-            </label>
-            <button className="mobile-menu-toggle" onClick={toggleMobileMenu}>
-              <span className="menu-icon"></span>
+          <div className="actions">
+            <ThemeToggle theme={theme} toggleTheme={toggleTheme} />
+            <button 
+              className="mobile-menu-toggle" 
+              onClick={toggleMobileMenu}
+              aria-label="Toggle menu"
+            >
+              <span className={`menu-icon ${mobileMenuOpen ? 'open' : ''}`}></span>
             </button>
           </div>
         </header>
-        <main className="app-main">
+        <main className="content">
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/upload" element={<Upload />} />
@@ -163,7 +155,7 @@ function App() {
           </Routes>
         </main>
         <footer className="app-footer">
-          <p>&copy; 2024 Space Cargo System | <a href="#">Documentation</a> | <a href="#">Support</a></p>
+          <p>&copy; 2025 Space Cargo System | <a href="#">Documentation</a> | <a href="#">Support</a></p>
         </footer>
       </div>
     </Router>

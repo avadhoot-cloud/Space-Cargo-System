@@ -3,8 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
 
-from .database import engine
-from . import models
+from .database import engine, Base
 from .routers import placement, search, upload, simulation
 import pathlib
 
@@ -22,17 +21,17 @@ data_dir = pathlib.Path(__file__).parent.parent.parent / "data"
 data_dir.mkdir(exist_ok=True)
 
 # Create database tables
-models.Base.metadata.create_all(bind=engine)
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Space Cargo System API")
 
-# Configure CORS with explicitly allowed origins
+# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],  # Frontend origins
+    allow_origins=["*"],  # Allows all origins
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
 )
 
 # Include routers
@@ -42,5 +41,5 @@ app.include_router(upload.router, prefix="/api/upload", tags=["upload"])
 app.include_router(simulation.router, prefix="/api/simulation", tags=["simulation"])
 
 @app.get("/")
-def read_root():
+async def root():
     return {"message": "Welcome to Space Cargo System API"} 

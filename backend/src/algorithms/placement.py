@@ -1,62 +1,221 @@
-from ..models import Item, Container
-from sqlalchemy.orm import Session
+import pandas as pd
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+from py3dbp import Packer, Bin, Item
+from datetime import datetime
+import math
 
-def find_optimal_position(item: Item, container: Container, db: Session):
-    """
-    Find the optimal position for an item in a container.
-    This is a simple implementation - in a real system, you'd implement more
-    sophisticated 3D bin packing algorithms.
+def calculate_sensitivity(items_df):
+    """Calculate item sensitivity based on name similarity using TF-IDF and cosine similarity."""
+    item_names = items_df['name'].astype(str).values
+    vectorizer = TfidfVectorizer()
+    tfidf_matrix = vectorizer.fit_transform(item_names)
+    similarity_matrix = cosine_similarity(tfidf_matrix)
+    sensitive_flags = (similarity_matrix < 0.2).sum(axis=1) > 0
+    items_df['sensitive'] = sensitive_flags.astype(int)
+    return items_df
+
+def load_and_preprocess_data(items_path, containers_path):
+    """Load and preprocess items and containers data with auto-handling of missing fields."""
+    # Load data with clean column names
+    items_df = pd.read_csv(items_path).rename(columns={
+        'mass_kg': 'weight_kg',
+        'usage_limit': 'usage_limit'
+    })
+    containers_df = pd.read_csv(containers_path)
     
-    Returns:
-        Dict with x, y, z coordinates or None if item cannot fit
-    """
-    # Check if item weight would exceed container capacity
-    if container.current_weight + item.weight > container.max_weight:
-        return None
+    # Auto-calculate missing container weights if needed
+    if 'max_weight_kg' not in containers_df:
+        # Estimate max weight as 500kg/m³ density * volume (cm³ to m³ conversion factor 1/1e6)
+        containers_df['max_weight_kg'] = containers_df.apply(
+            lambda x: (x['width_cm'] * x['height_cm'] * x['depth_cm']) / 1e6 * 500,
+            axis=1
+        )
     
-    # Get all items already in the container
-    existing_items = db.query(Item).filter(Item.container_id == container.id).all()
+    # Calculate volumes
+    items_df['item_volume'] = items_df['width_cm'] * items_df['depth_cm'] * items_df['height_cm']
+    containers_df['container_volume'] = containers_df['width_cm'] * containers_df['depth_cm'] * containers_df['height_cm']
     
-    # Simple 3D grid representation of the container (1 = occupied, 0 = free)
-    grid = [[[0 for z in range(container.depth)] 
-             for y in range(container.height)] 
-             for x in range(container.width)]
+    # Handle missing priority values
+    if 'priority' not in items_df:
+        items_df['priority'] = 1  # Default to lowest priority
     
-    # Mark occupied positions
-    for existing_item in existing_items:
-        if all(coord is not None for coord in [existing_item.position_x, 
-                                              existing_item.position_y, 
-                                              existing_item.position_z]):
-            # Approximate the item as a cube for simplicity
-            # In a real system, you'd handle actual item dimensions
-            size = int(existing_item.volume ** (1/3))  # Approximate cube size
-            
-            for dx in range(size):
-                for dy in range(size):
-                    for dz in range(size):
-                        x, y, z = existing_item.position_x + dx, existing_item.position_y + dy, existing_item.position_z + dz
-                        if 0 <= x < container.width and 0 <= y < container.height and 0 <= z < container.depth:
-                            grid[x][y][z] = 1
+    # Calculate sensitivity
+    items_df = calculate_sensitivity(items_df)
     
-    # Calculate approximate size of the current item (simplified as a cube)
-    item_size = int(item.volume ** (1/3))
+    # Handle expiry dates: keep as pandas datetime objects so .dt accessor works
+    today = pd.Timestamp.today()
+    items_df['expiry_date'] = pd.to_datetime(items_df['expiry_date'], errors='coerce')
+    items_df['days_before_expiry'] = (items_df['expiry_date'] - today).dt.days
+    items_df['days_before_expiry'] = items_df['days_before_expiry'].apply(
+        lambda x: x if pd.notnull(x) and x >= 0 else 36500
+    )
     
-    # Find first available position where the item can fit
-    for x in range(container.width - item_size + 1):
-        for y in range(container.height - item_size + 1):
-            for z in range(container.depth - item_size + 1):
-                # Check if the space is free
-                can_fit = True
-                for dx in range(item_size):
-                    for dy in range(item_size):
-                        for dz in range(item_size):
-                            if grid[x + dx][y + dy][z + dz] == 1:
-                                can_fit = False
-                                break
-                    if not can_fit:
-                        break
-                if can_fit:
-                    return {"x": x, "y": y, "z": z}
+    return items_df, containers_df
+
+def pack_items(items_df, containers_df):
+    """Pack items into containers considering zones, priority, and sensitivity."""
+    # Sort items by priority (desc), days before expiry (asc), sensitivity (desc)
+    sorted_items = items_df.sort_values(
+        by=['priority', 'days_before_expiry', 'sensitive'],
+        ascending=[False, True, False]
+    )
     
-    # If we get here, the item couldn't fit
-    return None 
+    # Group containers by zone
+    zones = containers_df['zone'].unique()
+    zone_containers = {zone: containers_df[containers_df['zone'] == zone] for zone in zones}
+    
+    all_placements = []
+    remaining_items = sorted_items.copy()
+    
+    # Pack items into preferred zone containers first
+    for zone in zones:
+        containers = zone_containers[zone]
+        if containers.empty:
+            continue
+        
+        # Get items preferring this zone
+        zone_items = remaining_items[remaining_items['preferred_zone'] == zone]
+        if zone_items.empty:
+            continue
+        
+        # Initialize packer
+        packer = Packer()
+        for _, container in containers.iterrows():
+            # Create a Bin with required positional arguments only
+            bin_obj = Bin(
+                container['container_id'],
+                container['width_cm'],
+                container['height_cm'],
+                container['depth_cm'],
+                container['max_weight_kg']
+            )
+            packer.addBin(bin_obj)
+        
+        # Add items to packer
+        for _, item in zone_items.iterrows():
+            # Create an Item with required positional arguments
+            item_obj = Item(
+                item['name'],
+                item['width_cm'],
+                item['height_cm'],
+                item['depth_cm'],
+                item['weight_kg']
+            )
+            # Set additional attributes as needed
+            item_obj.partno = item['item_id']
+            item_obj.level = item['priority']
+            item_obj.put_type = 1  # if needed for later use
+            item_obj.color = 'red' if item['sensitive'] else 'green'
+            packer.addItem(item_obj)
+        
+        # Pack items
+        packer.pack(bigger_first=True, distribute_items=False, fix_point=True)
+        
+        # Record placements
+        for bin_obj in packer.bins:
+            for item_obj in bin_obj.items:
+                all_placements.append({
+                    'item_id': item_obj.partno,
+                    'container_id': bin_obj.identifier,  # or use bin_obj.partno if set manually
+                    'x_cm': round(item_obj.position[0], 1),
+                    'y_cm': round(item_obj.position[1], 1),
+                    'z_cm': round(item_obj.position[2], 1),
+                    'rotation': item_obj.rotation_type,
+                    'width': item_obj.width,
+                    'depth': item_obj.depth,
+                    'height': item_obj.height,
+                    'priority': item_obj.level,
+                    'sensitive': 'Yes' if item_obj.color == 'red' else 'No',
+                    'expiry_days': item_obj.userdata.get('expiry_days', 36500)
+                })
+        
+        # Update remaining items
+        placed_ids = [p['item_id'] for p in all_placements]
+        remaining_items = remaining_items[~remaining_items['item_id'].isin(placed_ids)]
+    
+    # Pack remaining items into any container
+    if not remaining_items.empty:
+        packer = Packer()
+        for _, container in containers_df.iterrows():
+            bin_obj = Bin(
+                container['container_id'],
+                container['width_cm'],
+                container['height_cm'],
+                container['depth_cm'],
+                container['max_weight_kg']
+            )
+            packer.addBin(bin_obj)
+        
+        for _, item in remaining_items.iterrows():
+            item_obj = Item(
+                item['name'],
+                item['width_cm'],
+                item['height_cm'],
+                item['depth_cm'],
+                item['weight_kg']
+            )
+            item_obj.partno = item['item_id']
+            item_obj.level = item['priority']
+            item_obj.put_type = 1
+            item_obj.color = 'red' if item['sensitive'] else 'green'
+            packer.addItem(item_obj)
+        
+        packer.pack(bigger_first=True, distribute_items=False, fix_point=True)
+        
+        for bin_obj in packer.bins:
+            for item_obj in bin_obj.items:
+                all_placements.append({
+                    'item_id': item_obj.partno,
+                    'container_id': bin_obj.identifier,
+                    'x_cm': round(item_obj.position[0], 1),
+                    'y_cm': round(item_obj.position[1], 1),
+                    'z_cm': round(item_obj.position[2], 1),
+                    'rotation': item_obj.rotation_type,
+                    'width': item_obj.width,
+                    'depth': item_obj.depth,
+                    'height': item_obj.height,
+                    'priority': item_obj.level,
+                    'sensitive': 'Yes' if item_obj.color == 'red' else 'No',
+                    'expiry_days': item_obj.userdata.get('expiry_days', 36500)
+                })
+        
+        placed_ids = [p['item_id'] for p in all_placements]
+        remaining_items = remaining_items[~remaining_items['item_id'].isin(placed_ids)]
+    
+    return pd.DataFrame(all_placements), remaining_items
+
+def generate_output(placed_df, unplaced_df):
+    """Generate CSV outputs with placement details."""
+    # Save placed items with full details
+    placed_output = placed_df[[
+        'item_id', 'container_id', 'x_cm', 'y_cm', 'z_cm',
+        'rotation', 'width', 'depth', 'height', 'priority',
+        'sensitive', 'expiry_days'
+    ]]
+    placed_output.to_csv('placed_items.csv', index=False)
+    
+    # Save unplaced items with reasons
+    if not unplaced_df.empty:
+        unplaced_output = unplaced_df[[
+            'item_id', 'name', 'width_cm', 'depth_cm', 'height_cm',
+            'weight_kg', 'priority', 'preferred_zone', 'sensitive'
+        ]]
+        unplaced_output['reason'] = 'No suitable container found'
+        unplaced_output.to_csv('unplaced_items.csv', index=False)
+    
+    # Print summary
+    print(f"\n📦 Placement Summary:")
+    print(f"✅ Successfully placed: {len(placed_df)} items")
+    print(f"🚫 Failed to place: {len(unplaced_df)} items")
+    print(f"📊 Placement rate: {len(placed_df)/(len(placed_df)+len(unplaced_df)):.1%}")
+
+if _name_ == "_main_":
+    # Load and preprocess data
+    items_df, containers_df = load_and_preprocess_data('input_items.csv', 'containers.csv')
+    
+    # Pack items into containers
+    placed_df, unplaced_df = pack_items(items_df, containers_df)
+    
+    # Generate output files
+    generate_output(placed_df, unplaced_df)

@@ -12,6 +12,17 @@ const Navbar = () => {
   const toggleMobileMenu = () => {
     setMobileMenuOpen(!mobileMenuOpen);
   };
+
+  const navItems = [
+    { path: "/", icon: "📊", text: "Dashboard" },
+    { path: "/placement", icon: "📍", text: "Placement" },
+    { path: "/search", icon: "🔍", text: "Search" },
+    { path: "/upload", icon: "📤", text: "Upload" },
+    { path: "/rearrangement", icon: "🔄", text: "Rearrangement" },
+    { path: "/waste", icon: "♻️", text: "Waste" },
+    { path: "/simulation", icon: "⏱️", text: "Simulation" },
+    { path: "/logs", icon: "📝", text: "Logs" }
+  ];
   
   return (
     <nav className="navbar">
@@ -22,85 +33,28 @@ const Navbar = () => {
         </Link>
         
         <div className={`navbar-menu ${mobileMenuOpen ? 'active' : ''}`}>
-          <Link 
-            to="/" 
-            className={`navbar-item ${location.pathname === '/' ? 'active' : ''}`}
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            <span className="navbar-item-icon">📊</span>
-            <span className="navbar-item-text">Dashboard</span>
-          </Link>
-          
-          <Link 
-            to="/placement" 
-            className={`navbar-item ${location.pathname === '/placement' ? 'active' : ''}`}
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            <span className="navbar-item-icon">📍</span>
-            <span className="navbar-item-text">Placement</span>
-          </Link>
-          
-          <Link 
-            to="/search" 
-            className={`navbar-item ${location.pathname === '/search' ? 'active' : ''}`}
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            <span className="navbar-item-icon">🔍</span>
-            <span className="navbar-item-text">Search</span>
-          </Link>
-          
-          <Link 
-            to="/upload" 
-            className={`navbar-item ${location.pathname === '/upload' ? 'active' : ''}`}
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            <span className="navbar-item-icon">📤</span>
-            <span className="navbar-item-text">Upload</span>
-          </Link>
-          
-          <Link 
-            to="/rearrangement" 
-            className={`navbar-item ${location.pathname === '/rearrangement' ? 'active' : ''}`}
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            <span className="navbar-item-icon">🔄</span>
-            <span className="navbar-item-text">Rearrangement</span>
-          </Link>
-          
-          <Link 
-            to="/waste" 
-            className={`navbar-item ${location.pathname === '/waste' ? 'active' : ''}`}
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            <span className="navbar-item-icon">♻️</span>
-            <span className="navbar-item-text">Waste</span>
-          </Link>
-          
-          <Link 
-            to="/simulation" 
-            className={`navbar-item ${location.pathname === '/simulation' ? 'active' : ''}`}
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            <span className="navbar-item-icon">⏱️</span>
-            <span className="navbar-item-text">Simulation</span>
-          </Link>
-          
-          <Link 
-            to="/logs" 
-            className={`navbar-item ${location.pathname === '/logs' ? 'active' : ''}`}
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            <span className="navbar-item-icon">📝</span>
-            <span className="navbar-item-text">Logs</span>
-          </Link>
+          {navItems.map((item) => (
+            <Link 
+              key={item.path}
+              to={item.path} 
+              className={`navbar-item ${location.pathname === item.path ? 'active' : ''}`}
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              <span className="navbar-item-icon">{item.icon}</span>
+              <span className="navbar-item-text">{item.text}</span>
+            </Link>
+          ))}
         </div>
         
         <div className="navbar-actions">
           <div className="theme-toggle-wrapper">
-            <span className="theme-label">{theme === 'light' ? 'Light' : 'Dark'} Mode</span>
             <ThemeToggle />
           </div>
-          <button className="mobile-menu-toggle" onClick={toggleMobileMenu}>
+          <button 
+            className="mobile-menu-toggle" 
+            onClick={toggleMobileMenu}
+            aria-label="Toggle menu"
+          >
             <span className={`menu-icon ${mobileMenuOpen ? 'open' : ''}`}></span>
           </button>
         </div>

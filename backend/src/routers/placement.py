@@ -1,208 +1,245 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from typing import List, Optional
+from datetime import datetime
 import logging
-from typing import Dict, List, Any
-import json
-import numpy as np
 
 from ..database import get_db
-from ..crud import container_crud, item_crud
-from ..algorithms import placement_manager
+from ..models import Container, Item, PlacementHistory
+from ..schemas.placement import (
+    ContainerCreate, Container,
+    ItemCreate, Item,
+    PlacementHistoryCreate, PlacementHistory,
+    PlacementRecommendation, PlacementStatistics,
+    PlacementResponse
+)
+from ..algorithms.placement_manager import PlacementManager
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 router = APIRouter(
+    prefix="/placement",
     tags=["placement"],
     responses={404: {"description": "Not found"}}
 )
 
-@router.post("/place")
-def place_item(item_id: int, container_id: int = None, db: Session = Depends(get_db)):
-    """
-    Place an item in a container, either in a specified container or
-    in the best container determined by the placement algorithm
-    """
+# Initialize placement manager
+placement_manager = PlacementManager()
+
+# Container endpoints
+@router.post("/containers/", response_model=Container)
+def create_container(container: ContainerCreate, db: Session = Depends(get_db)):
+    db_container = Container(**container.model_dump())
+    db.add(db_container)
+    db.commit()
+    db.refresh(db_container)
+    return db_container
+
+@router.get("/containers/", response_model=List[Container])
+def read_containers(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    containers = db.query(Container).offset(skip).limit(limit).all()
+    return containers
+
+@router.get("/containers/{container_id}", response_model=Container)
+def read_container(container_id: int, db: Session = Depends(get_db)):
+    container = db.query(Container).filter(Container.id == container_id).first()
+    if container is None:
+        raise HTTPException(status_code=404, detail="Container not found")
+    return container
+
+# Item endpoints
+@router.post("/items/", response_model=Item)
+def create_item(item: ItemCreate, db: Session = Depends(get_db)):
+    db_item = Item(**item.model_dump())
+    db.add(db_item)
+    db.commit()
+    db.refresh(db_item)
+    return db_item
+
+@router.get("/items/", response_model=List[Item])
+def read_items(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    items = db.query(Item).offset(skip).limit(limit).all()
+    return items
+
+@router.get("/items/{item_id}", response_model=Item)
+def read_item(item_id: int, db: Session = Depends(get_db)):
+    item = db.query(Item).filter(Item.id == item_id).first()
+    if item is None:
+        raise HTTPException(status_code=404, detail="Item not found")
+    return item
+
+# Placement endpoints
+@router.post("/place", response_model=PlacementResponse)
+def place_item(item_id: int, container_id: Optional[int] = None, db: Session = Depends(get_db)):
     try:
         logger.info(f"Processing placement request for item_id={item_id}, container_id={container_id}")
         
-        # Use the placement_manager to place the item
-        result = placement_manager.place_item(db, item_id, container_id)
-        
-        if result.get("success"):
-            logger.info(f"Successfully placed item {item_id} in container {result.get('container_id')}")
-            return result
+        # Get item and container
+        item = db.query(Item).filter(Item.id == item_id).first()
+        if not item:
+            raise HTTPException(status_code=404, detail="Item not found")
+            
+        if container_id:
+            container = db.query(Container).filter(Container.id == container_id).first()
+            if not container:
+                raise HTTPException(status_code=404, detail="Container not found")
         else:
-            raise HTTPException(status_code=400, detail=result.get("message", "Failed to place item"))
+            # Find optimal container if not specified
+            containers = db.query(Container).all()
+            if not containers:
+                raise HTTPException(status_code=404, detail="No containers available")
+                
+            container = placement_manager.find_optimal_container(item, containers)
+            if not container:
+                raise HTTPException(status_code=400, detail="No suitable container found")
         
+        # Place the item
+        result = placement_manager.place_item(db, item, container)
+        
+        if result["success"]:
+            # Update item status
+            item.is_placed = True
+            item.container_id = container.id
+            item.position_x = result["position_x"]
+            item.position_y = result["position_y"]
+            item.position_z = result["position_z"]
+            item.placement_date = datetime.now()
+            
+            # Update container usage
+            container.used_volume += item.width * item.height * item.depth
+            container.used_weight += item.weight
+            container.is_full = container.used_volume >= (container.width * container.height * container.depth * 0.95)
+            
+            # Record in history
+            history = PlacementHistory(
+                item_id=item.id,
+                container_id=container.id,
+                placement_date=datetime.now(),
+                success=True,
+                reason="Successfully placed item"
+            )
+            db.add(history)
+            
+            db.commit()
+            
+            return PlacementResponse(
+                success=True,
+                message="Item placed successfully",
+                container_id=container.id,
+                position_x=result["position_x"],
+                position_y=result["position_y"],
+                position_z=result["position_z"]
+            )
+        else:
+            raise HTTPException(status_code=400, detail=result["message"])
+            
     except HTTPException as he:
-        # Re-raise HTTP exceptions
         raise he
     except Exception as e:
         logger.error(f"Error in place_item: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error placing item: {str(e)}")
 
-@router.get("/statistics")
+@router.get("/recommendations", response_model=List[PlacementRecommendation])
+def get_placement_recommendations(db: Session = Depends(get_db)):
+    try:
+        logger.info("Fetching placement recommendations")
+        
+        # Get unplaced items
+        unplaced_items = db.query(Item).filter(Item.is_placed == False).all()
+        if not unplaced_items:
+            return []
+            
+        # Get available containers
+        containers = db.query(Container).filter(Container.is_full == False).all()
+        if not containers:
+            raise HTTPException(status_code=404, detail="No containers available")
+            
+        recommendations = []
+        for item in unplaced_items:
+            # Find optimal container for the item
+            optimal_container = placement_manager.find_optimal_container(item, containers)
+            if optimal_container:
+                # Calculate compatibility score
+                score = placement_manager.calculate_compatibility_score(item, optimal_container)
+                
+                recommendations.append(PlacementRecommendation(
+                    item_id=item.id,
+                    item_name=item.name,
+                    container_id=optimal_container.id,
+                    container_name=optimal_container.name,
+                    reasoning=placement_manager.generate_reasoning(item, optimal_container, score),
+                    score=score
+                ))
+        
+        # Sort recommendations by score (highest first)
+        recommendations.sort(key=lambda x: x.score, reverse=True)
+        
+        logger.info(f"Generated {len(recommendations)} placement recommendations")
+        return recommendations
+        
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        logger.error(f"Error in get_placement_recommendations: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Error generating recommendations: {str(e)}")
+
+@router.get("/statistics", response_model=PlacementStatistics)
 def get_placement_statistics(db: Session = Depends(get_db)):
-    """
-    Get statistics about the placement algorithm performance
-    """
     try:
         logger.info("Fetching placement statistics")
         
-        # Use the placement_manager to get statistics
-        statistics = placement_manager.get_placement_statistics(db)
+        # Get total items and placed items
+        total_items = db.query(Item).count()
+        placed_items = db.query(Item).filter(Item.is_placed == True).count()
         
-        logger.info(f"Placement statistics: {json.dumps(statistics)}")
-        return statistics
+        # Calculate success rate
+        successful_placements = db.query(PlacementHistory).filter(PlacementHistory.success == True).count()
+        total_placements = db.query(PlacementHistory).count()
+        success_rate = (successful_placements / total_placements * 100) if total_placements > 0 else 0
+        
+        # Calculate space utilization
+        containers = db.query(Container).all()
+        total_volume = sum(c.width * c.height * c.depth for c in containers)
+        used_volume = sum(c.used_volume for c in containers)
+        space_utilization = (used_volume / total_volume * 100) if total_volume > 0 else 0
+        
+        # Calculate priority satisfaction
+        high_priority_items = db.query(Item).filter(Item.priority >= 70).count()
+        placed_high_priority = db.query(Item).filter(Item.priority >= 70, Item.is_placed == True).count()
+        priority_satisfaction = (placed_high_priority / high_priority_items * 100) if high_priority_items > 0 else 0
+        
+        # Calculate zone match rate
+        zone_matches = db.query(Item).filter(
+            Item.is_placed == True,
+            Item.preferred_zone == Container.zone
+        ).join(Container).count()
+        zone_match_rate = (zone_matches / placed_items * 100) if placed_items > 0 else 0
+        
+        # Calculate efficiency
+        efficiency = (success_rate + priority_satisfaction + zone_match_rate) / 3
+        
+        # Get container utilization details
+        container_utilization = []
+        for container in containers:
+            utilization = (container.used_volume / (container.width * container.height * container.depth)) * 100
+            container_utilization.append({
+                "id": container.id,
+                "name": container.name,
+                "utilization_percentage": utilization
+            })
+        
+        return PlacementStatistics(
+            total_items_placed=placed_items,
+            space_utilization=space_utilization,
+            success_rate=success_rate,
+            efficiency=efficiency,
+            priority_satisfaction=priority_satisfaction,
+            zone_match_rate=zone_match_rate,
+            container_utilization=container_utilization
+        )
         
     except Exception as e:
         logger.error(f"Error in get_placement_statistics: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Error fetching placement statistics: {str(e)}")
-
-def find_optimal_container(item, containers):
-    """
-    Find the best container for an item based on multiple factors:
-    - Available space
-    - Item priority
-    - Zone preferences
-    - Container accessibility
-    """
-    compatible_containers = []
-    
-    for container in containers:
-        # Skip containers that are too small
-        if not can_fit_physically(item, container):
-            continue
-            
-        # Skip containers that are already full
-        container_volume = container.width * container.height * container.depth
-        used_volume = container.used_volume or 0
-        item_volume = item.width * item.height * item.depth
-        
-        if used_volume + item_volume > container_volume * 0.95:  # 95% capacity as cutoff
-            continue
-            
-        # Calculate compatibility score
-        score = calculate_compatibility_score(item, container)
-        compatible_containers.append({
-            "container": container,
-            "score": score
-        })
-    
-    if not compatible_containers:
-        return None
-        
-    # Sort by compatibility score (higher is better)
-    compatible_containers.sort(key=lambda x: x["score"], reverse=True)
-    return compatible_containers[0]["container"]
-
-def calculate_compatibility_score(item, container):
-    """Calculate a compatibility score between an item and a container"""
-    score = 0
-    
-    # 1. Space fit (30%)
-    container_volume = container.width * container.height * container.depth
-    used_volume = container.used_volume or 0
-    remaining_volume = container_volume - used_volume
-    item_volume = item.width * item.height * item.depth
-    
-    if remaining_volume <= 0:
-        return 0
-        
-    volume_ratio = item_volume / remaining_volume
-    # Higher score when the item uses an appropriate amount of the remaining space
-    space_score = 30 * (1 - abs(volume_ratio - 0.7))
-    score += max(0, space_score)
-    
-    # 2. Zone preference (25%)
-    if item.preferred_zone and container.zone == item.preferred_zone:
-        score += 25
-    
-    # 3. Accessibility (20%)
-    # Less filled containers are more accessible
-    fill_ratio = used_volume / container_volume if container_volume > 0 else 1
-    accessibility_score = 20 * (1 - fill_ratio)
-    score += accessibility_score
-    
-    # 4. Priority consideration (15%)
-    # Higher priority items get better placement
-    if item.priority:
-        priority_score = 15 * (item.priority / 100) * (1 - fill_ratio)
-        score += priority_score
-    
-    # 5. Weight considerations (10%)
-    # Check if weight capacity is respected
-    if hasattr(container, 'max_weight') and hasattr(item, 'weight'):
-        if container.max_weight and item.weight:
-            if item.weight <= container.max_weight:
-                weight_score = 10 * (1 - (item.weight / container.max_weight))
-                score += weight_score
-    else:
-        # No weight constraints, add partial score
-        score += 5
-    
-    return score
-
-def can_fit_physically(item, container):
-    """Check if an item can physically fit in a container based on dimensions"""
-    # Get all possible orientations of the item
-    item_dims = [item.width, item.height, item.depth]
-    container_dims = [container.width, container.height, container.depth]
-    
-    # Try all possible rotations
-    for perm in get_permutations(item_dims):
-        if all(perm[i] <= container_dims[i] for i in range(3)):
-            return True
-            
-    return False
-
-def get_permutations(dims):
-    """Get all possible orientations of an item"""
-    return [
-        [dims[0], dims[1], dims[2]],
-        [dims[0], dims[2], dims[1]],
-        [dims[1], dims[0], dims[2]],
-        [dims[1], dims[2], dims[0]],
-        [dims[2], dims[0], dims[1]],
-        [dims[2], dims[1], dims[0]]
-    ]
-
-def calculate_position(item, container):
-    """
-    Calculate the optimal position for an item in a container
-    Uses a simplified gravity-based placement strategy
-    """
-    # Get items already in this container
-    items_in_container = item_crud.get_items_by_container(None, container.id)
-    
-    # Container dimensions
-    container_width = container.width
-    container_height = container.height
-    container_depth = container.depth
-    
-    # If no items in container, place at bottom corner
-    if not items_in_container:
-        return (0, 0, 0)
-    
-    # Find the highest point in the container for a basic stacking approach
-    highest_y = 0
-    for existing_item in items_in_container:
-        if existing_item.position_y is not None and existing_item.height is not None:
-            item_top = existing_item.position_y + existing_item.height
-            highest_y = max(highest_y, item_top)
-    
-    # Place on top of highest point
-    # In a real implementation, you would use a more sophisticated 3D bin packing algorithm
-    y = highest_y
-    
-    # Random x,z with margins
-    margin = min(5, container_width * 0.05, container_depth * 0.05)
-    max_x = max(0, container_width - item.width - 2 * margin)
-    max_z = max(0, container_depth - item.depth - 2 * margin)
-    
-    x = margin + (np.random.random() * max_x if max_x > 0 else 0)
-    z = margin + (np.random.random() * max_z if max_z > 0 else 0)
-    
-    return (float(x), float(y), float(z)) 
+        raise HTTPException(status_code=500, detail=f"Error fetching placement statistics: {str(e)}") 

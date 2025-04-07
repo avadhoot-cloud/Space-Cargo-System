@@ -1,26 +1,24 @@
-import React, { useContext } from 'react';
-import { ThemeContext } from '../context/ThemeContext';
+import React from 'react';
+import Toggle from 'react-toggle';
+import 'react-toggle/style.css';
 import '../styles/ThemeToggle.css';
 
-const ThemeToggle = () => {
-  const { theme, toggleTheme } = useContext(ThemeContext);
+const ThemeToggle = ({ theme, toggleTheme }) => {
+  const isDark = theme === 'dark';
 
   return (
     <div className="theme-toggle">
-      <input
-        type="checkbox"
+      <Toggle
         id="theme-toggle-checkbox"
-        className="theme-toggle-checkbox"
-        checked={theme === 'dark'}
+        className="custom-toggle"
+        checked={isDark}
         onChange={toggleTheme}
+        icons={{
+          checked: <span className="toggle-icon moon">🌙</span>,
+          unchecked: <span className="toggle-icon sun">☀️</span>,
+        }}
+        aria-label="Toggle dark mode"
       />
-      <label htmlFor="theme-toggle-checkbox" className="theme-toggle-label">
-        <span className="theme-toggle-inner"></span>
-        <span className="theme-toggle-switch"></span>
-      </label>
-      <span className="theme-toggle-icon">
-        {theme === 'light' ? '☀️' : '🌙'}
-      </span>
     </div>
   );
 };

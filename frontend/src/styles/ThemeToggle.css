@@ -1,115 +1,93 @@
 .theme-toggle {
   display: flex;
   align-items: center;
-  cursor: pointer;
-  margin-left: 15px;
   position: relative;
+  margin-left: 10px;
 }
 
-.theme-toggle-checkbox {
-  height: 0;
-  width: 0;
-  visibility: hidden;
-  position: absolute;
+/* Custom styling for react-toggle */
+.custom-toggle.react-toggle {
+  transform: scale(0.8);
 }
 
-.theme-toggle-label {
+/* Track styling */
+.custom-toggle.react-toggle .react-toggle-track {
+  background-color: #f0f0f0;
+  border: 1px solid #ddd;
+  height: 24px;
+  transition: all 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  cursor: pointer;
-  width: 60px;
-  height: 30px;
-  background: linear-gradient(to right, #f1c40f, #e74c3c);
-  border-radius: 100px;
-  position: relative;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 5px var(--shadow-color);
+  padding: 0 6px;
 }
 
-[data-theme="dark"] .theme-toggle-label {
-  background: linear-gradient(to right, #2c3e50, #2980b9);
+.custom-toggle.react-toggle:hover:not(.react-toggle--disabled) .react-toggle-track {
+  background-color: #e8e8e8;
 }
 
-.theme-toggle-label .theme-toggle-inner {
-  width: 24px;
-  height: 24px;
-  background: #fff;
-  border-radius: 50%;
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  transition: left 0.25s cubic-bezier(0.68, -0.55, 0.27, 1.55);
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+.custom-toggle.react-toggle--checked .react-toggle-track {
+  background-color: #2c3e50;
+  border-color: #1a2530;
+}
+
+.custom-toggle.react-toggle--checked:hover:not(.react-toggle--disabled) .react-toggle-track {
+  background-color: #1c2e40;
+}
+
+/* Thumb (the moving part) styling */
+.custom-toggle.react-toggle .react-toggle-thumb {
+  border: 1px solid #ccc;
+  background-color: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  height: 20px;
+  width: 20px;
+  top: 1px;
+  left: 1px;
+  z-index: 5;
+}
+
+.custom-toggle.react-toggle--checked .react-toggle-thumb {
+  left: 23px;
+  border-color: #1a2530;
+}
+
+/* Icons */
+.toggle-icon {
+  font-size: 11px;
+  line-height: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  height: 100%;
+  position: relative;
+  z-index: 1;
 }
 
-[data-theme="light"] .theme-toggle-label .theme-toggle-inner::before {
-  content: '☀️';
-  font-size: 12px;
-  position: absolute;
+.toggle-icon.sun {
+  right: -1px;
+  transform: scale(0.9);
 }
 
-[data-theme="dark"] .theme-toggle-label .theme-toggle-inner::before {
-  content: '🌙';
-  font-size: 12px;
-  position: absolute;
+.toggle-icon.moon {
+  left: -1px;
+  transform: scale(0.9);
 }
 
-/* Move the toggle knob by updating the left position */
-.theme-toggle-checkbox:checked + .theme-toggle-label .theme-toggle-inner {
-  left: 33px; /* 60px - 24px - 3px = 33px */
+/* Focused state */
+.custom-toggle.react-toggle:focus-within .react-toggle-track {
+  box-shadow: 0 0 0 2px rgba(66, 153, 225, 0.4);
 }
 
-.theme-toggle-icon {
-  display: none;
+/* Active animation */
+.custom-toggle.react-toggle--checked .react-toggle-thumb,
+.custom-toggle.react-toggle .react-toggle-thumb {
+  transition: all 0.2s ease;
 }
 
-/* Light theme specific styles */
-[data-theme="light"] .theme-toggle-label {
-  border: 1px solid #f1c40f;
-}
-
-/* Dark theme specific styles */
-[data-theme="dark"] .theme-toggle-label {
-  border: 1px solid #2980b9;
-}
-
-/* Hover and focus effects */
-.theme-toggle-label:hover {
-  opacity: 0.9;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px var(--shadow-color);
-}
-
-/* Styles for focus state for accessibility */
-.theme-toggle-checkbox:focus + .theme-toggle-label {
-  box-shadow: 0 0 0 3px var(--accent-color);
-}
-
-/* Responsive styles */
+/* Responsive adjustments */
 @media (max-width: 480px) {
-  .theme-toggle-label {
-    width: 50px;
-    height: 24px;
-  }
-  
-  .theme-toggle-label .theme-toggle-inner {
-    width: 18px;
-    height: 18px;
-    top: 3px;
-    left: 3px;
-    transition: left 0.25s cubic-bezier(0.68, -0.55, 0.27, 1.55);
-  }
-  
-  .theme-toggle-checkbox:checked + .theme-toggle-label .theme-toggle-inner {
-    left: calc(100% - 21px); /* Adjusted for smaller container */
-  }
-  
-  [data-theme="light"] .theme-toggle-label .theme-toggle-inner::before,
-  [data-theme="dark"] .theme-toggle-label .theme-toggle-inner::before {
-    font-size: 10px;
+  .custom-toggle.react-toggle {
+    transform: scale(0.75);
   }
 }
