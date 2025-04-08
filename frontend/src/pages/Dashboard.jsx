@@ -34,10 +34,11 @@ const Dashboard = () => {
         });
         
         setPlacementStats({
-          space_utilization: 0,
-          success_rate: 0,
-          zone_match_rate: 0,
-          efficiency: 0,
+          volume_utilization_percent: 0,
+          placement_rate_percent: 0,
+          total_items: 0,
+          placed_items: 0,
+          unplaced_items: 0,
           container_utilization: []
         });
         
@@ -101,10 +102,11 @@ const Dashboard = () => {
         });
         
         setPlacementStats({
-          space_utilization: 0,
-          success_rate: 0,
-          zone_match_rate: 0,
-          efficiency: 0,
+          volume_utilization_percent: 0,
+          placement_rate_percent: 0,
+          total_items: 0,
+          placed_items: 0,
+          unplaced_items: 0,
           container_utilization: []
         });
         
@@ -125,6 +127,9 @@ const Dashboard = () => {
 
   // Format percentages
   const formatPercent = (value) => {
+    if (value === undefined || value === null) {
+      return "0.0%";
+    }
     return `${value.toFixed(1)}%`;
   };
 
@@ -188,22 +193,22 @@ const Dashboard = () => {
         <div className="stats-grid">
           <StatsCard
             title="Space Utilization"
-            value={placementStats ? formatPercent(placementStats.space_utilization) : "0.0%"}
+            value={placementStats ? formatPercent(placementStats.volume_utilization_percent) : "0.0%"}
             icon="📏"
           />
           <StatsCard
-            title="Success Rate"
-            value={placementStats ? formatPercent(placementStats.success_rate) : "0.0%"}
+            title="Placement Rate"
+            value={placementStats ? formatPercent(placementStats.placement_rate_percent) : "0.0%"}
             icon="✅"
           />
           <StatsCard
-            title="Zone Match Rate"
-            value={placementStats ? formatPercent(placementStats.zone_match_rate) : "0.0%"}
+            title="Items Placed"
+            value={placementStats?.placed_items || 0}
             icon="🎯"
           />
           <StatsCard
-            title="Overall Efficiency"
-            value={placementStats ? formatPercent(placementStats.efficiency) : "0.0%"}
+            title="Unplaced Items"
+            value={placementStats?.unplaced_items || 0}
             icon="⚡"
           />
         </div>
@@ -253,9 +258,9 @@ const Dashboard = () => {
                 <div className="container-util-bar-container">
                   <div 
                     className="container-util-bar" 
-                    style={{ width: `${container.utilization_percentage}%` }}
+                    style={{ width: `${container.utilization_percent || 0}%` }}
                   >
-                    {container.utilization_percentage.toFixed(1)}%
+                    {(container.utilization_percent || 0).toFixed(1)}%
                   </div>
                 </div>
               </div>

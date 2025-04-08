@@ -21,18 +21,25 @@ const Rearrangement = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
+      setError(null);
       
-      // Fetch placement results and statistics
-      const [resultsResponse, statsResponse] = await Promise.all([
-        apiService.placement.getResults(),
-        apiService.placement.getStatistics()
-      ]);
+      // Fetch placement results
+      const resultsResponse = await apiService.placement.getResults();
       
-      setPlacementResults(resultsResponse.data);
-      setSpaceUtilization(statsResponse.data.space_utilization);
-      
-      // Generate rearrangement recommendations
-      generateRecommendations(resultsResponse.data);
+      if (resultsResponse.data && resultsResponse.data.success) {
+        setPlacementResults(resultsResponse.data);
+        
+        // Calculate overall space utilization
+        const totalUtilization = Object.values(resultsResponse.data.container_utilization || {})
+          .reduce((sum, cont) => sum + (cont.utilization || 0), 0);
+        const avgUtilization = totalUtilization / (Object.keys(resultsResponse.data.container_utilization || {}).length || 1);
+        setSpaceUtilization(avgUtilization);
+        
+        // Generate recommendations
+        generateRecommendations(resultsResponse.data);
+      } else {
+        setError('Failed to load placement data');
+      }
       
       setLoading(false);
     } catch (err) {
@@ -43,62 +50,56 @@ const Rearrangement = () => {
   };
 
   const generateRecommendations = (data) => {
-    if (!data || !data.containers || !data.placed_items) return;
+    if (!data || !data.containers || !data.placed_items) {
+      setRecommendations([]);
+      return;
+    }
     
     const recommendations = [];
-    
+    const lowUtilization = [];
+    const highUtilization = [];
+    const zoningIssues = [];
+
     // Calculate container utilization
-    const containerUtilization = {};
     data.containers.forEach(container => {
-      const containerItems = data.placed_items.filter(item => item.container_id === container.container_id);
-      const usedVolume = containerItems.reduce((total, item) => {
-        return total + (item.width_cm * item.height_cm * item.depth_cm);
-      }, 0);
-      const totalVolume = container.width_cm * container.height_cm * container.depth_cm;
+      const totalVolume = container.width * container.height * container.depth;
+      const usedVolume = container.items.reduce((sum, item) => sum + (item.volume || 0), 0);
       const utilization = (usedVolume / totalVolume) * 100;
-      
-      containerUtilization[container.container_id] = {
-        container,
-        utilization,
-        usedVolume,
-        totalVolume
-      };
+
+      if (utilization < 30) {
+        lowUtilization.push({
+          container_id: container.container_id,
+          utilization,
+          items: container.items
+        });
+      } else if (utilization > 90) {
+        highUtilization.push({
+          container_id: container.container_id,
+          utilization,
+          items: container.items
+        });
+      }
     });
-    
-    // Find containers with utilization < 50%
-    const lowUtilizationContainers = Object.values(containerUtilization)
-      .filter(cont => cont.utilization < 50)
-      .sort((a, b) => a.utilization - b.utilization);
-      
-    // Find containers with utilization > 80%
-    const highUtilizationContainers = Object.values(containerUtilization)
-      .filter(cont => cont.utilization > 80)
-      .sort((a, b) => b.utilization - a.utilization);
-    
-    // Generate recommendations for consolidation
-    if (lowUtilizationContainers.length > 0) {
+
+    // Generate recommendations based on utilization
+    if (lowUtilization.length > 0) {
       recommendations.push({
         type: 'consolidation',
-        title: `Consolidate ${lowUtilizationContainers[0].container.container_id}`,
-        description: `Container ${lowUtilizationContainers[0].container.container_id} is at ${lowUtilizationContainers[0].utilization.toFixed(1)}% capacity. Consider consolidating items to free up space.`,
-        container: lowUtilizationContainers[0].container,
-        utilization: lowUtilizationContainers[0].utilization
+        title: 'Container Consolidation',
+        description: 'Consolidate items from low utilization containers',
+        containers: lowUtilization
       });
     }
-    
-    // Generate recommendations for load balancing
-    if (highUtilizationContainers.length > 0 && lowUtilizationContainers.length > 0) {
+
+    if (highUtilization.length > 0) {
       recommendations.push({
         type: 'balancing',
-        title: 'Balance Container Load',
-        description: `Move items from ${highUtilizationContainers[0].container.container_id} (${highUtilizationContainers[0].utilization.toFixed(1)}% full) to ${lowUtilizationContainers[0].container.container_id} (${lowUtilizationContainers[0].utilization.toFixed(1)}% full) to balance the load.`,
-        sourceContainer: highUtilizationContainers[0].container,
-        targetContainer: lowUtilizationContainers[0].container,
-        sourceUtilization: highUtilizationContainers[0].utilization,
-        targetUtilization: lowUtilizationContainers[0].utilization
+        title: 'Load Balancing',
+        description: 'Redistribute items from high utilization containers',
+        containers: highUtilization
       });
     }
-    
+
     // Generate zone-based recommendations
     const itemsInWrongZone = data.placed_items.filter(item => {
       const itemData = data.items.find(i => i.item_id === item.item_id);
@@ -118,56 +119,62 @@ const Rearrangement = () => {
     setRecommendations(recommendations);
   };
 
+  const handleViewPlan = (recommendation) => {
+    setSelectedContainer(recommendation);
+    setShowRearrangementModal(true);
+    generateRearrangementPlan(recommendation);
+  };
+
   const generateRearrangementPlan = (recommendation) => {
-    const plan = [];
-    
+    if (!placementResults || !placementResults.containers) {
+      console.error('Placement data not loaded');
+      setRearrangementPlan([]);
+      return;
+    }
+
+    const plan = {
+      moves: [],
+      estimatedTime: 0
+    };
+
     if (recommendation.type === 'consolidation') {
-      const container = recommendation.container;
-      const containerItems = placementResults.placed_items.filter(
-        item => item.container_id === container.container_id
+      // Implementation for consolidation
+      const sourceContainers = recommendation.containers;
+      const targetContainer = placementResults.containers.find(c => 
+        !sourceContainers.some(sc => sc.container_id === c.container_id) &&
+        c.items.length < c.max_items
       );
-      
-      // Find target containers
-      const otherContainers = placementResults.containers.filter(
-        c => c.container_id !== container.container_id
-      );
-      
-      if (otherContainers.length > 0) {
-        // Pick the first container as target for simplicity
-        const targetContainer = otherContainers[0];
-        
-        // Generate plan to move items
-        containerItems.forEach((item, index) => {
-          plan.push({
-            step: index + 1,
-            action: 'move',
-            itemId: item.item_id,
-            itemName: (placementResults.items.find(i => i.item_id === item.item_id) || {}).name || `Item ${item.item_id}`,
-            fromContainer: container.container_id,
-            toContainer: targetContainer.container_id
+
+      if (targetContainer) {
+        sourceContainers.forEach(source => {
+          source.items.forEach(item => {
+            plan.moves.push({
+              item_id: item.item_id,
+              from_container: source.container_id,
+              to_container: targetContainer.container_id,
+              reason: 'Consolidation'
+            });
           });
         });
       }
     } else if (recommendation.type === 'balancing') {
-      const sourceContainer = recommendation.sourceContainer;
-      const targetContainer = recommendation.targetContainer;
-      
-      // Get items from source container
-      const sourceItems = placementResults.placed_items.filter(
-        item => item.container_id === sourceContainer.container_id
+      const sourceContainers = recommendation.containers;
+      const targetContainers = placementResults.containers.filter(c => 
+        !sourceContainers.some(sc => sc.container_id === c.container_id)
       );
       
-      // Move half of the items to target container
-      const itemsToMove = sourceItems.slice(0, Math.ceil(sourceItems.length / 2));
-      
-      itemsToMove.forEach((item, index) => {
-        plan.push({
-          step: index + 1,
-          action: 'move',
-          itemId: item.item_id,
-          itemName: (placementResults.items.find(i => i.item_id === item.item_id) || {}).name || `Item ${item.item_id}`,
-          fromContainer: sourceContainer.container_id,
-          toContainer: targetContainer.container_id
+      sourceContainers.forEach(source => {
+        const itemsToMove = source.items.slice(0, Math.ceil(source.items.length / 2));
+        itemsToMove.forEach(item => {
+          const targetContainer = targetContainers.find(c => c.container_id !== source.container_id);
+          if (targetContainer) {
+            plan.moves.push({
+              item_id: item.item_id,
+              from_container: source.container_id,
+              to_container: targetContainer.container_id,
+              reason: 'Load Balancing'
+            });
+          }
         });
       });
     } else if (recommendation.type === 'zoning') {
@@ -187,137 +194,78 @@ const Rearrangement = () => {
         const targetContainer = placementResults.containers.find(c => c.zone === itemData.preferred_zone);
         if (!targetContainer) return;
         
-        plan.push({
-          step: index + 1,
-          action: 'move',
-          itemId: item.item_id,
-          itemName: itemData.name || `Item ${item.item_id}`,
-          fromContainer: item.container_id,
-          toContainer: targetContainer.container_id
+        plan.moves.push({
+          item_id: item.item_id,
+          from_container: item.container_id,
+          to_container: targetContainer.container_id,
+          reason: 'Zoning'
         });
       });
     }
     
-    return plan;
-  };
-
-  const handleViewPlan = (recommendation) => {
-    const plan = generateRearrangementPlan(recommendation);
     setRearrangementPlan(plan);
-    setShowRearrangementModal(true);
   };
 
   if (loading) {
-    return (
-      <div className="loading-container">
-        <div className="loader"></div>
-        <p>Loading rearrangement data...</p>
-      </div>
-    );
+    return <div className="loading">Loading...</div>;
   }
-  
+
   if (error) {
-    return (
-      <div className="error-container">
-        <div className="error-icon">⚠️</div>
-        <p>{error}</p>
-        <button onClick={fetchData} className="retry-button">Retry</button>
-      </div>
-    );
+    return <div className="error">{error}</div>;
   }
-  
+
   return (
-    <div className="rearrangement-page">
-      <h1>Rearrangement Recommendations</h1>
-      <p>Get smart suggestions for reorganizing cargo to maximize space efficiency.</p>
+    <div className="rearrangement-container">
+      <h1>Container Rearrangement</h1>
       
-      <div className="rearrangement-dashboard">
-        <div className="space-utilization">
-          <h2>Space Utilization</h2>
-          <div className="utilization-chart">
-            <div className="chart-bg">
-              <div 
-                className={`chart-bar ${spaceUtilization > 80 ? 'high' : spaceUtilization > 50 ? 'medium' : 'low'}`} 
-                style={{ width: `${spaceUtilization}%` }}
-              >
-                {spaceUtilization.toFixed(1)}%
-              </div>
-            </div>
-          </div>
-          <p>Current space utilization across all modules</p>
+      <div className="stats-container">
+        <div className="stat-card">
+          <h3>Space Utilization</h3>
+          <p>{spaceUtilization.toFixed(1)}%</p>
         </div>
-        
-        <div className="recommendations-section">
-          <h2>Recommended Actions</h2>
-          
-          {recommendations.length > 0 ? (
-            <div className="action-cards">
-              {recommendations.map((recommendation, index) => (
-                <div className="action-card" key={index}>
-                  <h3>{recommendation.title}</h3>
-                  <p>{recommendation.description}</p>
-                  <button 
-                    className="action-button"
-                    onClick={() => handleViewPlan(recommendation)}
-                  >
-                    View Plan
-                  </button>
+        <div className="stat-card">
+          <h3>Items Placed</h3>
+          <p>{placementResults?.placed_items?.length || 0}</p>
+        </div>
+        <div className="stat-card">
+          <h3>Unplaced Items</h3>
+          <p>{placementResults?.unplaced_items?.length || 0}</p>
+        </div>
+      </div>
+      
+      <div className="recommendations-container">
+        <h2>Recommendations</h2>
+        {recommendations.length > 0 ? (
+          <div className="recommendations-list">
+            {recommendations.map((rec, index) => (
+              <div key={index} className="recommendation-card">
+                <h3>{rec.title}</h3>
+                <p>{rec.description}</p>
+                <button onClick={() => handleViewPlan(rec)}>View Plan</button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p>No recommendations available</p>
+        )}
+      </div>
+      
+      {showRearrangementModal && (
+        <div className="modal">
+          <div className="modal-content">
+            <h2>Rearrangement Plan</h2>
+            <h3>{selectedContainer?.title}</h3>
+            <div className="plan-steps">
+              {rearrangementPlan.moves.map((move, index) => (
+                <div key={index} className="plan-step">
+                  <span className="step-number">Step {index + 1}:</span>
+                  <span className="step-action">
+                    Move {move.item_id} from Container {move.from_container} to Container {move.to_container}
+                  </span>
                 </div>
               ))}
             </div>
-          ) : (
-            <div className="no-recommendations">
-              <p>No rearrangement recommendations at this time. Current arrangement is optimal.</p>
-            </div>
-          )}
-        </div>
-      </div>
-      
-      {/* Rearrangement Plan Modal */}
-      {showRearrangementModal && (
-        <div className="modal-overlay">
-          <div className="rearrangement-modal">
-            <div className="modal-header">
-              <h3>Rearrangement Plan</h3>
-              <button 
-                className="close-modal-button"
-                onClick={() => setShowRearrangementModal(false)}
-              >
-                ✕
-              </button>
-            </div>
-            
-            <div className="modal-content">
-              {rearrangementPlan.length > 0 ? (
-                <>
-                  <p>Follow these steps to rearrange items:</p>
-                  <ol className="rearrangement-steps">
-                    {rearrangementPlan.map((step, index) => (
-                      <li key={index}>
-                        {step.action === 'move' ? (
-                          <span>
-                            Move {step.itemName} from Container {step.fromContainer} to Container {step.toContainer}
-                          </span>
-                        ) : (
-                          <span>{step.action} {step.itemName}</span>
-                        )}
-                      </li>
-                    ))}
-                  </ol>
-                </>
-              ) : (
-                <p>No rearrangement steps needed.</p>
-              )}
-            </div>
-            
-            <div className="modal-footer">
-              <button 
-                className="modal-button"
-                onClick={() => setShowRearrangementModal(false)}
-              >
-                Close
-              </button>
-            </div>
+            <button onClick={() => setShowRearrangementModal(false)}>Close</button>
           </div>
         </div>
       )}

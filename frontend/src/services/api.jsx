@@ -38,11 +38,11 @@ API.interceptors.response.use(
 const apiService = {
   // Placement APIs
   placement: {
-    getStatistics: () => API.get('/placement/statistics'),
-    processData: () => API.post('/placement/process'),
-    getResults: () => API.get('/placement/results'),
-    getRecommendations: () => API.get('/placement/recommendations'),
-    placeItem: (itemId, containerId, userId = 'system') => API.post('/placement/place', {
+    getStatistics: () => API.get('/placement/statistics/'),
+    processData: () => API.post('/placement/process/'),
+    getResults: () => API.get('/placement/results/'),
+    getRecommendations: () => API.get('/placement/recommendations/'),
+    placeItem: (itemId, containerId, userId = 'system') => API.post('/placement/place/', {
       item_id: itemId,
       container_id: containerId,
       user_id: userId
@@ -55,9 +55,9 @@ const apiService = {
       const params = {};
       if (itemId) params.item_id = itemId;
       if (itemName) params.item_name = itemName;
-      return API.get('/search', { params });
+      return API.get('/placement/search/', { params });
     },
-    retrieveItem: (itemId, userId = 'system') => API.post('/retrieve', {
+    retrieveItem: (itemId, userId = 'system') => API.post('/placement/retrieve/', {
       item_id: itemId,
       user_id: userId
     }),
@@ -65,24 +65,24 @@ const apiService = {
   
   // Waste Management APIs
   waste: {
-    identify: () => API.get('/waste/identify'),
-    returnPlan: (undockingContainerId, undockingDate, maxWeight) => API.post('/waste/return-plan', {
+    identify: () => API.get('/placement/waste/identify/'),
+    returnPlan: (undockingContainerId, undockingDate, maxWeight) => API.post('/placement/waste/return-plan/', {
       undockingContainerId,
       undockingDate,
       maxWeight
     }),
-    completeUndocking: (undockingContainerId) => API.post('/waste/complete-undocking', {
+    completeUndocking: (undockingContainerId) => API.post('/placement/waste/complete-undocking/', {
       undockingContainerId
     }),
   },
   
   // Time Simulation API
   simulation: {
-    simulateDays: (numOfDays, itemsToBeUsedPerDay = []) => API.post('/simulate/day', {
+    simulateDays: (numOfDays, itemsToBeUsedPerDay = []) => API.post('/simulation/simulate/', {
       numOfDays,
       itemsToBeUsedPerDay
     }),
-    simulateToDate: (toTimestamp, itemsToBeUsedPerDay = []) => API.post('/simulate/day', {
+    simulateToDate: (toTimestamp, itemsToBeUsedPerDay = []) => API.post('/simulation/simulate/', {
       toTimestamp,
       itemsToBeUsedPerDay
     }),
@@ -90,19 +90,19 @@ const apiService = {
   
   // Import/Export APIs
   data: {
-    importItems: (formData) => API.post('/import/items', formData, {
+    importItems: (formData) => API.post('/upload/items/', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
     }),
-    importContainers: (formData) => API.post('/import/containers', formData, {
+    importContainers: (formData) => API.post('/upload/containers/', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
     }),
-    exportArrangement: () => API.get('/export/arrangement'),
-    getContainers: () => API.get('/containers/'),
-    getItems: () => API.get('/items/'),
+    exportArrangement: () => API.get('/placement/export/arrangement/'),
+    getContainers: () => API.get('/placement/containers/'),
+    getItems: () => API.get('/placement/items/'),
   },
   
   // Logging API
@@ -114,7 +114,7 @@ const apiService = {
       if (itemId) params.itemId = itemId;
       if (userId) params.userId = userId;
       if (actionType) params.actionType = actionType;
-      return API.get('/logs', { params });
+      return API.get('/placement/logs/', { params });
     },
   },
 };

@@ -1,7 +1,8 @@
 import logging
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 import os
+from fastapi.responses import JSONResponse
 
 from .database import engine, Base
 from .routers import placement, search, upload, simulation
@@ -23,7 +24,10 @@ data_dir.mkdir(exist_ok=True)
 # Create database tables
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="Space Cargo System API")
+app = FastAPI(
+    title="Space Cargo System API",
+    default_response_class=JSONResponse  # Ensure JSON responses
+)
 
 # Configure CORS
 app.add_middleware(
@@ -34,6 +38,13 @@ app.add_middleware(
     allow_headers=["*"],  # Allows all headers
 )
 
+# Add middleware to ensure JSON content type in responses
+@app.middleware("http")
+async def add_content_type_header(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["Content-Type"] = "application/json"
+    return response
+
 # Include routers
 app.include_router(placement.router, prefix="/api/placement", tags=["placement"])
 app.include_router(search.router, prefix="/api/search", tags=["search"])
@@ -42,4 +53,4 @@ app.include_router(simulation.router, prefix="/api/simulation", tags=["simulatio
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to Space Cargo System API"} 
+    return {"message": "Welcome to Space Cargo System API", "status": "online"} 

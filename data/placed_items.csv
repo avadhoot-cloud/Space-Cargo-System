@@ -1,1 +1,6 @@
-item_id,container_id,x_cm,y_cm,z_cm,rotation,width,height,depth,priority,sensitive
+item_id,container_id,x_cm,y_cm,z_cm,width_cm,depth_cm,height_cm
+1,4,0,0,0,21,54,32
+3,3,0,0,0,39,55,28
+4,4,0,0,32,37,34,31
+5,1,0,0,0,33,30,33
+2,4,0,0,63,47,38,19

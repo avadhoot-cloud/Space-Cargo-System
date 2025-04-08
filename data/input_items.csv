@@ -1,6 +1,6 @@
-item_id,name,width_cm,height_cm,depth_cm,weight_kg,priority,preferred_zone
-1,Container 1,21,32,54,4.0,4,maintenance
-2,Equipment 2,47,19,38,9.4,1,maintenance
-3,Box 3,39,28,55,6.8,4,medical
-4,Container 4,37,31,34,3.4,3,maintenance
-5,Tool 5,33,33,30,4.1,3,storage
+item_id,name,width_cm,height_cm,depth_cm,weight_kg,priority,preferred_zone,volume,sensitive
+1,Container 1,21,32,54,4.0,4,maintenance,36288,1
+2,Equipment 2,47,19,38,9.4,1,maintenance,33934,1
+3,Box 3,39,28,55,6.8,4,medical,60060,1
+4,Container 4,37,31,34,3.4,3,maintenance,38998,1
+5,Tool 5,33,33,30,4.1,3,storage,32670,1

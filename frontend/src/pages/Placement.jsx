@@ -200,58 +200,58 @@ const Placement = () => {
             <div className="stat-card">
               <div className="stat-icon">📊</div>
               <h3>Space Utilization</h3>
-              <p className="stat-value">{placementStats.space_utilization.toFixed(1)}%</p>
+              <p className="stat-value">{placementStats.volume_utilization_percent !== undefined ? placementStats.volume_utilization_percent.toFixed(1) + '%' : '0.0%'}</p>
               <div className="progress-bar">
                 <div 
                   className="progress-fill" 
-                  style={{ width: `${placementStats.space_utilization}%` }}
+                  style={{ width: `${placementStats.volume_utilization_percent || 0}%` }}
                 ></div>
               </div>
             </div>
             <div className="stat-card">
               <div className="stat-icon">✅</div>
-              <h3>Success Rate</h3>
-              <p className="stat-value">{placementStats.success_rate.toFixed(1)}%</p>
+              <h3>Placement Rate</h3>
+              <p className="stat-value">{placementStats.placement_rate_percent !== undefined ? placementStats.placement_rate_percent.toFixed(1) + '%' : '0.0%'}</p>
               <div className="progress-bar">
                 <div 
                   className="progress-fill success" 
-                  style={{ width: `${placementStats.success_rate}%` }}
+                  style={{ width: `${placementStats.placement_rate_percent || 0}%` }}
                 ></div>
               </div>
             </div>
             <div className="stat-card">
-              <div className="stat-icon">⚡</div>
-              <h3>Overall Efficiency</h3>
-              <p className="stat-value">{placementStats.efficiency.toFixed(1)}%</p>
+              <div className="stat-icon">📦</div>
+              <h3>Placed Items</h3>
+              <p className="stat-value">{placementStats.placed_items || 0}</p>
               <div className="progress-bar">
                 <div 
                   className="progress-fill efficiency" 
-                  style={{ width: `${placementStats.efficiency}%` }}
+                  style={{ width: `${(placementStats.placed_items / (placementStats.total_items || 1)) * 100 || 0}%` }}
                 ></div>
               </div>
             </div>
-            {placementStats.priority_satisfaction && (
+            {placementStats.unplaced_items !== undefined && (
               <div className="stat-card">
                 <div className="stat-icon">🔝</div>
-                <h3>Priority Satisfaction</h3>
-                <p className="stat-value">{placementStats.priority_satisfaction.toFixed(1)}%</p>
+                <h3>Unplaced Items</h3>
+                <p className="stat-value">{placementStats.unplaced_items}</p>
                 <div className="progress-bar">
                   <div 
                     className="progress-fill priority" 
-                    style={{ width: `${placementStats.priority_satisfaction}%` }}
+                    style={{ width: `${(placementStats.unplaced_items / (placementStats.total_items || 1)) * 100 || 0}%` }}
                   ></div>
                 </div>
               </div>
             )}
-            {placementStats.zone_match_rate && (
+            {placementStats.zone_match_rate !== undefined && (
               <div className="stat-card">
                 <div className="stat-icon">🎯</div>
                 <h3>Zone Match Rate</h3>
-                <p className="stat-value">{placementStats.zone_match_rate.toFixed(1)}%</p>
+                <p className="stat-value">{placementStats.zone_match_rate !== undefined ? placementStats.zone_match_rate.toFixed(1) + '%' : '0.0%'}</p>
                 <div className="progress-bar">
                   <div 
                     className="progress-fill zone" 
-                    style={{ width: `${placementStats.zone_match_rate}%` }}
+                    style={{ width: `${placementStats.zone_match_rate || 0}%` }}
                   ></div>
                 </div>
               </div>
@@ -268,9 +268,9 @@ const Placement = () => {
                     <div className="utilization-bar-container">
                       <div 
                         className="utilization-bar" 
-                        style={{ height: `${container.utilization_percentage}%` }}
+                        style={{ height: `${container.utilization_percent || 0}%` }}
                       >
-                        <span className="utilization-text">{Math.round(container.utilization_percentage)}%</span>
+                        <span className="utilization-text">{Math.round(container.utilization_percent || 0)}%</span>
                       </div>
                     </div>
                   </div>

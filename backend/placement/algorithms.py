@@ -25,10 +25,41 @@ class PlacementManager:
         if not items_path.exists() or not containers_path.exists():
             logger.warning(f"CSV files not found: {items_path} or {containers_path}")
             return None, None
-            
+        
         try:
+            # Load items data
             items_df = pd.read_csv(items_path)
+            # Ensure required columns exist
+            required_item_columns = ['item_id', 'name', 'width_cm', 'height_cm', 'depth_cm', 'weight_kg']
+            for col in required_item_columns:
+                if col not in items_df.columns:
+                    logger.error(f"Missing required column in items CSV: {col}")
+                    return None, None
+            
+            # Load containers data
             containers_df = pd.read_csv(containers_path)
+            # Ensure required columns exist
+            required_container_columns = ['container_id', 'name', 'width_cm', 'height_cm', 'depth_cm', 'max_weight_kg', 'zone']
+            for col in required_container_columns:
+                if col not in containers_df.columns:
+                    logger.error(f"Missing required column in containers CSV: {col}")
+                    return None, None
+            
+            # Calculate volumes
+            items_df['volume'] = items_df['width_cm'] * items_df['height_cm'] * items_df['depth_cm']
+            containers_df['volume'] = containers_df['width_cm'] * containers_df['height_cm'] * containers_df['depth_cm']
+            
+            # Add remaining_volume to containers
+            containers_df['remaining_volume'] = containers_df['volume']
+            
+            # Handle missing expiry dates and convert to datetime
+            if 'expiry_date' in items_df.columns:
+                items_df['expiry_date'] = pd.to_datetime(items_df['expiry_date'], errors='coerce')
+            
+            # Calculate sensitivity based on name similarity if not present
+            if 'sensitive' not in items_df.columns:
+                items_df = self.calculate_sensitivity(items_df)
+            
             return items_df, containers_df
         except Exception as e:
             logger.error(f"Error loading CSV files: {str(e)}")
@@ -48,7 +79,10 @@ class PlacementManager:
         containers_df['remaining_volume'] = containers_df['volume']
         
         # Handle missing expiry dates and convert to datetime
-        items_df['expiry_date'] = pd.to_datetime(items_df['expiry_date'], errors='coerce')
+        if 'expiry_date' in items_df.columns:
+            items_df['expiry_date'] = pd.to_datetime(items_df['expiry_date'], errors='coerce')
+        else:
+            items_df['expiry_date'] = pd.NaT  # Add empty expiry date column
         
         # Calculate sensitivity based on name similarity
         items_df = self.calculate_sensitivity(items_df)
@@ -117,7 +151,6 @@ class PlacementManager:
                     container.get('max_weight_kg', float('inf')) - container_data_entry['weight_used'] >= item_weight):
                     
                     # Calculate position (simple stacking for now)
-                    # In a real implementation, you would use a 3D packing algorithm
                     current_items = container_data_entry['items']
                     position = (0, 0, 0)  # Default position at origin
                     
@@ -237,94 +270,84 @@ class PlacementManager:
         return placements_df, unplaced_df
     
     def get_placement_efficiency(self):
-        """Calculate efficiency metrics for the current placement."""
-        items_df, containers_df = self.load_from_csv()
-        placements_df, unplaced_df = self.load_results()
-        
-        if items_df is None or containers_df is None or placements_df is None:
-            return {
-                "efficiency": 0,
-                "space_utilization": 0,
-                "success_rate": 0,
-                "priority_satisfaction": 0,
-                "zone_match_rate": 0
-            }
-        
-        # Calculate metrics
-        total_items = len(items_df)
-        placed_items = len(placements_df)
-        
-        # Space utilization
-        total_container_volume = containers_df['volume'].sum()
-        total_item_volume = 0
-        
-        for _, placement in placements_df.iterrows():
-            total_item_volume += placement['width_cm'] * placement['depth_cm'] * placement['height_cm']
-        
-        space_utilization = (total_item_volume / total_container_volume * 100) if total_container_volume > 0 else 0
-        
-        # Success rate
-        success_rate = (placed_items / total_items * 100) if total_items > 0 else 0
-        
-        # Priority satisfaction (higher priority items should be placed first)
-        priority_satisfied = 80  # Placeholder - would need to calculate based on placement order
-        
-        # Zone match rate (items should be in preferred zones)
-        zone_matches = 0
-        zone_match_rate = 0
-        
-        if placed_items > 0:
-            for _, placement in placements_df.iterrows():
-                item_id = placement['item_id']
-                container_id = placement['container_id']
-                
-                # Get item's preferred zone
-                item_row = items_df[items_df['item_id'] == item_id]
-                if not item_row.empty and 'preferred_zone' in item_row.columns:
-                    preferred_zone = item_row['preferred_zone'].iloc[0]
-                    
-                    # Get container's zone
-                    container_row = containers_df[containers_df['container_id'] == container_id]
-                    if not container_row.empty:
-                        container_zone = container_row['zone'].iloc[0]
-                        
-                        if preferred_zone == container_zone:
-                            zone_matches += 1
+        """Calculate the efficiency metrics of current placement arrangement."""
+        try:
+            # Load data
+            items_df, containers_df = self.load_from_csv()
+            if items_df is None or containers_df is None:
+                return {
+                    "success": False,
+                    "message": "Failed to load data from CSV files",
+                    "statistics": {}
+                }
             
-            zone_match_rate = (zone_matches / placed_items * 100)
-        
-        # Overall efficiency (weighted average)
-        efficiency = (space_utilization * 0.4 + success_rate * 0.3 + priority_satisfied * 0.15 + zone_match_rate * 0.15)
-        
-        # Container utilization details
-        container_utilization = []
-        for _, container in containers_df.iterrows():
-            container_id = container['container_id']
-            container_volume = container['volume']
+            # Load placement results
+            placements_df, unplaced_df = self.load_results()
             
-            # Calculate used volume for this container
+            # Calculate basic metrics
+            total_items = len(items_df)
+            placed_items = len(placements_df) if placements_df is not None else 0
+            unplaced_items = total_items - placed_items
+            
+            # Calculate placement rate
+            placement_rate = (placed_items / total_items * 100) if total_items > 0 else 0
+            
+            # Calculate volume utilization
+            total_container_volume = containers_df['volume'].sum()
             used_volume = 0
-            container_placements = placements_df[placements_df['container_id'] == container_id]
+            container_utilization = []
             
-            for _, placement in container_placements.iterrows():
-                used_volume += placement['width_cm'] * placement['depth_cm'] * placement['height_cm']
+            if placements_df is not None:
+                for _, container in containers_df.iterrows():
+                    container_id = container['container_id']
+                    container_volume = container['volume']
+                    
+                    # Find items in this container
+                    container_items = placements_df[placements_df['container_id'] == container_id]
+                    
+                    # Calculate volume used in this container
+                    container_used_volume = 0
+                    for _, item in container_items.iterrows():
+                        item_volume = item['width_cm'] * item['height_cm'] * item['depth_cm']
+                        container_used_volume += item_volume
+                    
+                    used_volume += container_used_volume
+                    
+                    # Calculate utilization for this container
+                    container_util = (container_used_volume / container_volume * 100) if container_volume > 0 else 0
+                    
+                    container_utilization.append({
+                        "container_id": container_id,
+                        "name": container['name'],
+                        "zone": container['zone'],
+                        "volume_cm3": float(container_volume),
+                        "used_volume_cm3": float(container_used_volume),
+                        "utilization_percent": float(container_util)
+                    })
             
-            utilization_percentage = (used_volume / container_volume * 100) if container_volume > 0 else 0
+            # Calculate overall volume utilization
+            volume_utilization = (used_volume / total_container_volume * 100) if total_container_volume > 0 else 0
             
-            container_utilization.append({
-                "id": container_id,
-                "name": container.get('name', f"Container {container_id}"),
-                "utilization_percentage": utilization_percentage
-            })
-        
-        return {
-            "efficiency": round(efficiency, 2),
-            "space_utilization": round(space_utilization, 2),
-            "success_rate": round(success_rate, 2),
-            "priority_satisfaction": round(priority_satisfied, 2),
-            "zone_match_rate": round(zone_match_rate, 2),
-            "container_utilization": container_utilization
-        }
+            return {
+                "success": True,
+                "statistics": {
+                    "total_items": int(total_items),
+                    "placed_items": int(placed_items),
+                    "unplaced_items": int(unplaced_items),
+                    "placement_rate_percent": float(placement_rate),
+                    "volume_utilization_percent": float(volume_utilization),
+                    "total_container_volume_cm3": float(total_container_volume),
+                    "used_volume_cm3": float(used_volume),
+                    "container_utilization": container_utilization
+                }
+            }
+        except Exception as e:
+            logger.error(f"Error calculating placement efficiency: {str(e)}")
+            return {
+                "success": False,
+                "message": f"Error calculating statistics: {str(e)}",
+                "statistics": {}
+            }
     
     def load_results(self):
         """Load placement results from CSV files."""
@@ -412,8 +435,7 @@ class PlacementManager:
                     valid_containers.sort(key=lambda x: x['remaining_volume'])
                     best_container = valid_containers[0]
                     best_container_id = best_container['container_id']
-                    best_reasoning = f"No containers available in preferred zone ({preferred_zone}). " + \
-                                    f"Selected container in zone {best_container['zone']} with sufficient space."
+                    best_reasoning = f"No containers available in preferred zone ({preferred_zone}). Selected container in zone {best_container['zone']} with sufficient space."
             
             if best_container_id:
                 score = 100 if zone_match else 70
@@ -451,8 +473,8 @@ class PlacementManager:
                 container_id = placement['container_id']
                 position = (placement['x_cm'], placement['y_cm'], placement['z_cm'])
                 
-                # Check expiry date
-                if 'expiry_date' in item and pd.notna(item['expiry_date']):
+                # Check expiry date if column exists
+                if 'expiry_date' in items_df.columns and pd.notna(item.get('expiry_date')):
                     try:
                         expiry_date = pd.to_datetime(item['expiry_date']).date()
                         if expiry_date <= today:
@@ -477,8 +499,8 @@ class PlacementManager:
                     except:
                         pass
                 
-                # Check usage limit
-                if 'usage_limit' in item and pd.notna(item['usage_limit']):
+                # Check usage limit if column exists
+                if 'usage_limit' in items_df.columns and pd.notna(item.get('usage_limit')):
                     if int(item['usage_limit']) <= 0:
                         waste_items.append({
                             "item_id": item_id,

@@ -258,8 +258,8 @@ const TimeSimulation = () => {
             <div className="expiry-alerts">
               <h3>Expired Items:</h3>
               <ul className="alerts-list">
-                {simulationResults.changes.itemsExpired.map((item, index) => (
-                  <li key={index} className="alert-item alert-critical">
+                {simulationResults.changes.itemsExpired.map((item) => (
+                  <li key={item.item_id} className="alert-item alert-critical">
                     <span className="alert-message">Item {item.name} (ID: {item.item_id}) has expired</span>
                   </li>
                 ))}
@@ -271,8 +271,8 @@ const TimeSimulation = () => {
             <div className="depletion-alerts">
               <h3>Depleted Items:</h3>
               <ul className="alerts-list">
-                {simulationResults.changes.itemsDepletedToday.map((item, index) => (
-                  <li key={index} className="alert-item alert-warning">
+                {simulationResults.changes.itemsDepletedToday.map((item) => (
+                  <li key={item.item_id} className="alert-item alert-warning">
                     <span className="alert-message">Item {item.name} (ID: {item.item_id}) is out of uses</span>
                   </li>
                 ))}

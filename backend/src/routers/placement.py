@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime
 import logging
+from fastapi.responses import JSONResponse
 
 from ..database import get_db
 from ..models import Container, Item, PlacementHistory
@@ -142,7 +143,8 @@ def place_item(item_id: int, container_id: Optional[int] = None, db: Session = D
         raise HTTPException(status_code=500, detail=f"Error placing item: {str(e)}")
 
 @router.get("/recommendations", response_model=List[PlacementRecommendation])
-def get_placement_recommendations(db: Session = Depends(get_db)):
+async def get_recommendations(db: Session = Depends(get_db)):
+    """Get placement recommendations for unplaced items."""
     try:
         logger.info("Fetching placement recommendations")
         
@@ -182,11 +184,12 @@ def get_placement_recommendations(db: Session = Depends(get_db)):
     except HTTPException as he:
         raise he
     except Exception as e:
-        logger.error(f"Error in get_placement_recommendations: {str(e)}", exc_info=True)
+        logger.error(f"Error in get_recommendations: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Error generating recommendations: {str(e)}")
 
 @router.get("/statistics", response_model=PlacementStatistics)
-def get_placement_statistics(db: Session = Depends(get_db)):
+async def get_placement_statistics(db: Session = Depends(get_db)):
+    """Get statistics about placement algorithm performance."""
     try:
         logger.info("Fetching placement statistics")
         

@@ -106,12 +106,13 @@ class PlacementStatisticsSerializer(serializers.Serializer):
     """
     Serializer for placement statistics.
     """
-    total_items_placed = serializers.IntegerField()
-    space_utilization = serializers.FloatField()
-    success_rate = serializers.FloatField()
-    efficiency = serializers.FloatField()
-    priority_satisfaction = serializers.FloatField(required=False)
-    zone_match_rate = serializers.FloatField(required=False)
+    total_items = serializers.IntegerField()
+    placed_items = serializers.IntegerField()
+    unplaced_items = serializers.IntegerField()
+    placement_rate_percent = serializers.FloatField()
+    volume_utilization_percent = serializers.FloatField()
+    total_container_volume_cm3 = serializers.FloatField()
+    used_container_volume_cm3 = serializers.FloatField()
     container_utilization = serializers.ListField(child=serializers.DictField())
 
 
