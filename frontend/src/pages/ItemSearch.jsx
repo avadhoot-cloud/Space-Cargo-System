@@ -16,10 +16,12 @@ const ItemSearch = () => {
     // Load all items on component mount
     const fetchItems = async () => {
       try {
+        console.log("DEBUG: Fetching all items");
         const response = await apiService.data.getItems();
+        console.log("DEBUG: Items fetched:", response.data);
         setItems(response.data);
       } catch (err) {
-        console.error('Error loading items:', err);
+        console.error('DEBUG: Error loading items:', err);
       }
     };
     
@@ -31,19 +33,22 @@ const ItemSearch = () => {
     if (!searchTerm.trim()) return;
 
     try {
+      console.log("DEBUG: Searching for:", searchTerm);
       setLoading(true);
       setError(null);
       
       // Try to find by ID first, then by name
-      const response = await apiService.search.findItem(
-        searchTerm.includes('-') ? searchTerm : null, 
-        !searchTerm.includes('-') ? searchTerm : null
-      );
+      const itemId = searchTerm.includes('-') ? searchTerm : null;
+      const itemName = !searchTerm.includes('-') ? searchTerm : null;
+      console.log("DEBUG: Search params - itemId:", itemId, "itemName:", itemName);
+      
+      const response = await apiService.search.findItem(itemId, itemName);
+      console.log("DEBUG: Search results:", response.data);
       
       setSearchResults(response.data);
       setLoading(false);
     } catch (err) {
-      console.error('Error searching items:', err);
+      console.error('DEBUG: Error searching items:', err);
       setError('Failed to search for items');
       setLoading(false);
     }
@@ -51,20 +56,23 @@ const ItemSearch = () => {
 
   const handleRetrieve = async (itemId) => {
     try {
+      console.log("DEBUG: Retrieving item:", itemId);
       setRetrieving(true);
       await apiService.search.retrieveItem(itemId);
       alert(`Item ${itemId} has been retrieved successfully`);
       
       // Refresh search results
+      console.log("DEBUG: Refreshing search results for item:", itemId);
       const response = await apiService.search.findItem(
         itemId,
         null
       );
+      console.log("DEBUG: Updated search results:", response.data);
       
       setSearchResults(response.data);
       setRetrieving(false);
     } catch (err) {
-      console.error('Error retrieving item:', err);
+      console.error('DEBUG: Error retrieving item:', err);
       setError('Failed to retrieve item');
       setRetrieving(false);
     }

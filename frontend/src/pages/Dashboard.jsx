@@ -17,6 +17,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     const fetchData = async () => {
+      console.log("DEBUG: Fetching dashboard data");
       setLoading(true);
       setError(null);
       
@@ -24,6 +25,7 @@ const Dashboard = () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       
       timeoutRef.current = setTimeout(() => {
+        console.log("DEBUG: Data loading timed out");
         setLoading(false);
         // Set default values if data loading times out
         setStats({
@@ -47,81 +49,56 @@ const Dashboard = () => {
       }, 15000); // 15 seconds timeout
       
       try {
-        // Fetch data summary
-        const [itemsRes, containersRes, placementStatsRes, wasteRes] = await Promise.all([
-          apiService.data.getItems(),
-          apiService.data.getContainers(),
-          apiService.placement.getStatistics(),
-          apiService.waste.identify()
-        ]);
-
-        // Clear timeout since data loaded successfully
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-          timeoutRef.current = null;
+        // Fetch placement statistics
+        console.log("DEBUG: Fetching placement statistics");
+        const statsResponse = await apiService.placement.getStatistics();
+        console.log("DEBUG: Placement statistics response:", statsResponse.data);
+        
+        if (statsResponse.data && statsResponse.data.stats) {
+          console.log("DEBUG: Setting placement stats:", statsResponse.data.stats);
+          setPlacementStats(statsResponse.data.stats);
+        } else {
+          console.log("DEBUG: No placement stats found in response");
         }
-
-        // Calculate stats
-        const items = itemsRes.data;
-        const containers = containersRes.data;
         
-        setStats({
-          totalItems: items.length,
-          totalContainers: containers.length,
-          totalZones: new Set(containers.map(c => c.zone)).size,
-          expiringSoon: items.filter(item => {
-            if (!item.expiry_date) return false;
-            const expiry = new Date(item.expiry_date);
-            const now = new Date();
-            const daysUntilExpiry = Math.floor((expiry - now) / (1000 * 60 * 60 * 24));
-            return daysUntilExpiry >= 0 && daysUntilExpiry <= 7;
-          }).length
-        });
+        // Fetch waste items
+        console.log("DEBUG: Fetching waste items");
+        const wasteResponse = await apiService.waste.identify();
+        console.log("DEBUG: Waste items response:", wasteResponse.data);
         
-        setPlacementStats(placementStatsRes.data);
-        setWasteItems(wasteRes.data.wasteItems || []);
+        if (wasteResponse.data && wasteResponse.data.waste_items) {
+          console.log("DEBUG: Setting waste items:", wasteResponse.data.waste_items);
+          setWasteItems(wasteResponse.data.waste_items);
+        } else {
+          console.log("DEBUG: No waste items found in response");
+        }
         
+        // Calculate summary statistics
+        console.log("DEBUG: Calculating summary statistics");
+        const summaryStats = {
+          totalItems: placementStats?.total_items || 0,
+          totalContainers: placementStats?.container_utilization?.length || 0,
+          totalZones: new Set(placementStats?.container_utilization?.map(c => c.zone) || []).size,
+          expiringSoon: wasteItems?.length || 0
+        };
+        console.log("DEBUG: Summary stats:", summaryStats);
+        setStats(summaryStats);
+        
+        // Clear timeout and set loading to false
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
         setLoading(false);
-        setError(null);
       } catch (err) {
-        console.error('Error fetching dashboard data:', err);
-        
-        // Clear timeout since we already have an error
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-          timeoutRef.current = null;
-        }
-        
+        console.error('DEBUG: Error fetching dashboard data:', err);
         setError('Failed to load dashboard data. Please try again.');
-        // Set default values on error
-        setStats({
-          totalItems: 0,
-          totalContainers: 0,
-          totalZones: 0,
-          expiringSoon: 0
-        });
-        
-        setPlacementStats({
-          volume_utilization_percent: 0,
-          placement_rate_percent: 0,
-          total_items: 0,
-          placed_items: 0,
-          unplaced_items: 0,
-          container_utilization: []
-        });
-        
-        setWasteItems([]);
         setLoading(false);
       }
     };
-
+    
     fetchData();
     
-    // Cleanup timeout on unmount
+    // Cleanup function
     return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, []);
 

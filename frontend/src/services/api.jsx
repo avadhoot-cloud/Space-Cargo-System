@@ -10,11 +10,12 @@ const API = axios.create({
 // Request interceptor
 API.interceptors.request.use(
   (config) => {
+    console.log(`DEBUG: API Request: ${config.method.toUpperCase()} ${config.url}`, config);
     // You can add auth tokens here if needed
     return config;
   },
   (error) => {
-    console.error('API Request Error:', error);
+    console.error('DEBUG: API Request Error:', error);
     return Promise.reject(error);
   }
 );
@@ -22,13 +23,14 @@ API.interceptors.request.use(
 // Response interceptor
 API.interceptors.response.use(
   (response) => {
+    console.log(`DEBUG: API Response: ${response.config.method.toUpperCase()} ${response.config.url}`, response.data);
     return response;
   },
   (error) => {
     if (error.response && error.response.data) {
-      console.error('API Response Error:', error.response.data);
+      console.error('DEBUG: API Response Error:', error.response.data);
     } else {
-      console.error('API Error:', error.message);
+      console.error('DEBUG: API Error:', error.message);
     }
     return Promise.reject(error);
   }
@@ -38,7 +40,12 @@ API.interceptors.response.use(
 const apiService = {
   // Placement APIs
   placement: {
-    getStatistics: () => API.get('/placement/statistics/'),
+    getStatistics: async () => {
+      console.log("DEBUG: API Request: /placement/statistics/");
+      var res = await API.get('/placement/statistics/');
+      console.log("DEBUG: API Response: /placement/statistics/", res.data);
+      return res;
+    },
     processData: () => API.post('/placement/process/'),
     getResults: () => API.get('/placement/results/'),
     getRecommendations: () => API.get('/placement/recommendations/'),
@@ -52,15 +59,19 @@ const apiService = {
   // Search and Retrieval APIs
   search: {
     findItem: (itemId, itemName) => {
+      console.log("DEBUG: API Request: /placement/search/", { itemId, itemName });
       const params = {};
       if (itemId) params.item_id = itemId;
       if (itemName) params.item_name = itemName;
       return API.get('/placement/search/', { params });
     },
-    retrieveItem: (itemId, userId = 'system') => API.post('/placement/retrieve/', {
-      item_id: itemId,
-      user_id: userId
-    }),
+    retrieveItem: (itemId, userId = 'system') => {
+      console.log("DEBUG: API Request: /placement/retrieve/", { itemId, userId });
+      return API.post('/placement/retrieve/', {
+        item_id: itemId,
+        user_id: userId
+      });
+    },
   },
   
   // Waste Management APIs

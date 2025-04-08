@@ -22,27 +22,41 @@ class PlacementManager:
         if not containers_path:
             containers_path = self.data_dir / 'containers.csv'
         
+        print(f"DEBUG: Looking for items at {items_path}")
+        print(f"DEBUG: Looking for containers at {containers_path}")
+        
         if not items_path.exists() or not containers_path.exists():
             logger.warning(f"CSV files not found: {items_path} or {containers_path}")
+            print(f"DEBUG: CSV files not found: {items_path} or {containers_path}")
             return None, None
         
         try:
             # Load items data
             items_df = pd.read_csv(items_path)
+            print(f"DEBUG: Loaded items: {len(items_df)} items")
+            print(f"DEBUG: Items columns: {items_df.columns.tolist()}")
+            print(f"DEBUG: First few items: {items_df.head().to_dict()}")
+            
             # Ensure required columns exist
             required_item_columns = ['item_id', 'name', 'width_cm', 'height_cm', 'depth_cm', 'weight_kg']
             for col in required_item_columns:
                 if col not in items_df.columns:
                     logger.error(f"Missing required column in items CSV: {col}")
+                    print(f"DEBUG: Missing required column in items CSV: {col}")
                     return None, None
             
             # Load containers data
             containers_df = pd.read_csv(containers_path)
+            print(f"DEBUG: Loaded containers: {len(containers_df)} containers")
+            print(f"DEBUG: Containers columns: {containers_df.columns.tolist()}")
+            print(f"DEBUG: First few containers: {containers_df.head().to_dict()}")
+            
             # Ensure required columns exist
             required_container_columns = ['container_id', 'name', 'width_cm', 'height_cm', 'depth_cm', 'max_weight_kg', 'zone']
             for col in required_container_columns:
                 if col not in containers_df.columns:
                     logger.error(f"Missing required column in containers CSV: {col}")
+                    print(f"DEBUG: Missing required column in containers CSV: {col}")
                     return None, None
             
             # Calculate volumes
@@ -63,6 +77,7 @@ class PlacementManager:
             return items_df, containers_df
         except Exception as e:
             logger.error(f"Error loading CSV files: {str(e)}")
+            print(f"DEBUG: Error loading CSV files: {str(e)}")
             return None, None
     
     def preprocess_data(self, items_df, containers_df):
@@ -272,9 +287,11 @@ class PlacementManager:
     def get_placement_efficiency(self):
         """Calculate the efficiency metrics of current placement arrangement."""
         try:
+            print("DEBUG: Starting get_placement_efficiency")
             # Load data
             items_df, containers_df = self.load_from_csv()
             if items_df is None or containers_df is None:
+                print("DEBUG: Failed to load items or containers data")
                 return {
                     "success": False,
                     "message": "Failed to load data from CSV files",
@@ -283,17 +300,23 @@ class PlacementManager:
             
             # Load placement results
             placements_df, unplaced_df = self.load_results()
-            
+            print(f"DEBUG: Placements: {placements_df}")
             # Calculate basic metrics
             total_items = len(items_df)
+            print(f"DEBUG: Total items: {total_items}")
+            # print(items_df)
             placed_items = len(placements_df) if placements_df is not None else 0
+            print(f"DEBUG: Placed items: {placed_items}")
             unplaced_items = total_items - placed_items
+            print(f"DEBUG: Unplaced items: {unplaced_items}")
             
             # Calculate placement rate
             placement_rate = (placed_items / total_items * 100) if total_items > 0 else 0
+            print(f"DEBUG: Placement rate: {placement_rate}%")
             
             # Calculate volume utilization
             total_container_volume = containers_df['volume'].sum()
+            print(f"DEBUG: Total container volume: {total_container_volume}")
             used_volume = 0
             container_utilization = []
             
@@ -301,9 +324,11 @@ class PlacementManager:
                 for _, container in containers_df.iterrows():
                     container_id = container['container_id']
                     container_volume = container['volume']
+                    print(f"DEBUG: Processing container {container_id} with volume {container_volume}")
                     
                     # Find items in this container
                     container_items = placements_df[placements_df['container_id'] == container_id]
+                    print(f"DEBUG: Container {container_id} has {len(container_items)} items")
                     
                     # Calculate volume used in this container
                     container_used_volume = 0
@@ -312,9 +337,11 @@ class PlacementManager:
                         container_used_volume += item_volume
                     
                     used_volume += container_used_volume
+                    print(f"DEBUG: Container {container_id} used volume: {container_used_volume}")
                     
                     # Calculate utilization for this container
                     container_util = (container_used_volume / container_volume * 100) if container_volume > 0 else 0
+                    print(f"DEBUG: Container {container_id} utilization: {container_util}%")
                     
                     container_utilization.append({
                         "container_id": container_id,
@@ -327,8 +354,9 @@ class PlacementManager:
             
             # Calculate overall volume utilization
             volume_utilization = (used_volume / total_container_volume * 100) if total_container_volume > 0 else 0
+            print(f"DEBUG: Overall volume utilization: {volume_utilization}%")
             
-            return {
+            result = {
                 "success": True,
                 "statistics": {
                     "total_items": int(total_items),
@@ -341,8 +369,13 @@ class PlacementManager:
                     "container_utilization": container_utilization
                 }
             }
+            print(f"DEBUG: Returning result: {result}")
+            return result
         except Exception as e:
             logger.error(f"Error calculating placement efficiency: {str(e)}")
+            print(f"DEBUG: Error calculating placement efficiency: {str(e)}")
+            import traceback
+            print(f"DEBUG: Traceback: {traceback.format_exc()}")
             return {
                 "success": False,
                 "message": f"Error calculating statistics: {str(e)}",
@@ -354,20 +387,35 @@ class PlacementManager:
         placed_path = self.data_dir / 'placed_items.csv'
         unplaced_path = self.data_dir / 'unplaced_items.csv'
         
+        print(f"DEBUG: Looking for placed items at {placed_path}")
+        print(f"DEBUG: Looking for unplaced items at {unplaced_path}")
+        
         placements_df = None
         unplaced_df = None
         
         if placed_path.exists():
             try:
                 placements_df = pd.read_csv(placed_path)
+                print(f"DEBUG: Loaded placed items: {len(placements_df)} items")
+                print(f"DEBUG: Placed items columns: {placements_df.columns.tolist()}")
+                print(f"DEBUG: First few placed items: {placements_df.head().to_dict()}")
             except Exception as e:
                 logger.error(f"Error loading placed items: {str(e)}")
+                print(f"DEBUG: Error loading placed items: {str(e)}")
+        else:
+            print(f"DEBUG: Placed items file not found at {placed_path}")
         
         if unplaced_path.exists():
             try:
                 unplaced_df = pd.read_csv(unplaced_path)
+                print(f"DEBUG: Loaded unplaced items: {len(unplaced_df)} items")
+                print(f"DEBUG: Unplaced items columns: {unplaced_df.columns.tolist()}")
+                print(f"DEBUG: First few unplaced items: {unplaced_df.head().to_dict()}")
             except Exception as e:
                 logger.error(f"Error loading unplaced items: {str(e)}")
+                print(f"DEBUG: Error loading unplaced items: {str(e)}")
+        else:
+            print(f"DEBUG: Unplaced items file not found at {unplaced_path}")
         
         return placements_df, unplaced_df
     

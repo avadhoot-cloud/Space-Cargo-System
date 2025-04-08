@@ -23,15 +23,20 @@ class ItemViewSet(viewsets.ModelViewSet):
 # API view for getting placement statistics
 @api_view(['GET'])
 def get_placement_stats(request):
+    print("DEBUG: get_placement_stats called")
     manager = PlacementManager()
     stats = manager.get_placement_efficiency()
+    print(f"DEBUG: Stats: {stats}")
     
     # If no stats found, try to load from CSV and recalculate
     if stats is None or not stats.get('success', False):
+        print("DEBUG: No stats found, trying to load from CSV")
         _, placement_df = manager.load_from_csv()
         if placement_df is not None:
+            print("DEBUG: Loaded placement data, recalculating stats")
             stats = manager.get_placement_efficiency()
     
+    print(f"DEBUG: Final stats: {stats}")
     return Response({
         'success': True,
         'stats': stats.get('statistics', {}) if stats else {}
@@ -125,13 +130,16 @@ def place_item(request):
 @api_view(['GET'])
 def search_item(request):
     """Search for items by ID or name."""
+    print("DEBUG: search_item called")
     item_id = request.query_params.get('item_id')
     item_name = request.query_params.get('item_name')
+    print(f"DEBUG: Search params - item_id: {item_id}, item_name: {item_name}")
     
     manager = PlacementManager()
     items_df, _ = manager.load_from_csv()
     
     if items_df is None:
+        print("DEBUG: No items data found")
         return Response({
             'success': False,
             'message': 'No items data found'
@@ -139,29 +147,37 @@ def search_item(request):
     
     # Search by ID or name
     if item_id:
+        print(f"DEBUG: Searching by item_id: {item_id}")
         item = items_df[items_df['item_id'] == item_id]
     elif item_name:
+        print(f"DEBUG: Searching by item_name: {item_name}")
         item = items_df[items_df['name'].str.contains(item_name, case=False, na=False)]
     else:
+        print("DEBUG: No search parameters provided")
         return Response({
             'success': False,
             'message': 'Please provide either item_id or item_name'
         })
     
     if item.empty:
+        print("DEBUG: Item not found")
         return Response({
             'success': False,
             'message': 'Item not found'
         })
     
     # Get placement information
+    print("DEBUG: Loading placement results")
     placements_df, _ = manager.load_results()
     placement = None
     if placements_df is not None:
         placement = placements_df[placements_df['item_id'] == item.iloc[0]['item_id']]
+        print(f"DEBUG: Placement found: {not placement.empty}")
     
     # Format response
     item_data = item.iloc[0].to_dict()
+    print(f"DEBUG: Item data: {item_data}")
+    
     response_data = {
         'success': True,
         'found': True,
@@ -179,42 +195,51 @@ def search_item(request):
         }
     }
     
+    print(f"DEBUG: Response data: {response_data}")
     return Response(response_data)
 
 # API view for retrieving an item from its container
 @api_view(['POST'])
 def retrieve_item(request):
     """Retrieve an item from its container."""
+    print("DEBUG: retrieve_item called")
     item_id = request.data.get('item_id')
     user_id = request.data.get('user_id', 'system')
+    print(f"DEBUG: Retrieve params - item_id: {item_id}, user_id: {user_id}")
     
     if not item_id:
+        print("DEBUG: Item ID is required")
         return Response({
             'success': False,
             'message': 'Item ID is required'
         })
     
     manager = PlacementManager()
+    print("DEBUG: Loading items and placements")
     items_df, _ = manager.load_from_csv()
     placements_df, _ = manager.load_results()
     
     if items_df is None or placements_df is None:
+        print("DEBUG: No data found")
         return Response({
             'success': False,
             'message': 'No data found'
         })
     
     # Find item and its placement
+    print(f"DEBUG: Finding item {item_id}")
     item = items_df[items_df['item_id'] == item_id]
     placement = placements_df[placements_df['item_id'] == item_id]
     
     if item.empty or placement.empty:
+        print("DEBUG: Item not found or not placed")
         return Response({
             'success': False,
             'message': 'Item not found or not placed'
         })
     
     # Generate log entry
+    print("DEBUG: Generating log entry")
     log_entry = manager.generate_log(
         action_type='retrieve',
         user_id=user_id,
@@ -222,6 +247,7 @@ def retrieve_item(request):
         details=f"Item retrieved from container {placement.iloc[0]['container_id']}"
     )
     
+    print(f"DEBUG: Log entry: {log_entry}")
     return Response({
         'success': True,
         'message': f"Item {item_id} has been retrieved successfully",
