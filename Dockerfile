@@ -21,14 +21,8 @@ COPY backend/ .
 # Create a directory for persistent data
 RUN mkdir -p /data
 
-# Pre-compile Python files to bytecode for faster startup
-RUN python -m compileall .
-
 # Expose port 8000
 EXPOSE 8000
 
-# Set up a minimal health check endpoint for faster response
-RUN echo 'from django.http import HttpResponse; def health(request): return HttpResponse("OK")' > healthcheck.py
-
-# Use Gunicorn with minimal configuration for fastest startup
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "1", "--threads", "2", "--preload", "--timeout", "5", "spacecargo.wsgi:application"]
+# Use our minimal health_app.py for extremely fast startup
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "health_app:application"]
