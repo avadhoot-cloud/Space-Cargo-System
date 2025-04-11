@@ -26,6 +26,5 @@ RUN mkdir -p /data
 # Expose port 8000 so that the backend can be reached
 EXPOSE 8000
 
-# Run the backend application using Uvicorn.
-# (Assumes your ASGI entry point is at spacecargo.wsgi:application)
-CMD ["uvicorn", "spacecargo.wsgi:application", "--host", "0.0.0.0", "--port", "8000"]
+# Run the Django server
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
