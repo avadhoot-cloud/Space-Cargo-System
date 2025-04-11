@@ -4,14 +4,27 @@ import axios from 'axios';
 
 // Create axios instance with base URL from environment variable
 const API = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8000/api'
+  baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8000/api/',
+  // Add trailing slash transformer
+  transformRequest: [
+    (data, headers) => {
+      if (headers['Content-Type'] === 'multipart/form-data') {
+        return data;
+      }
+      return JSON.stringify(data);
+    },
+    ...axios.defaults.transformRequest
+  ]
 });
 
 // Request interceptor
 API.interceptors.request.use(
   (config) => {
+    // Ensure URL ends with trailing slash
+    if (!config.url.endsWith('/')) {
+      config.url += '/';
+    }
     console.log(`DEBUG: API Request: ${config.method.toUpperCase()} ${config.url}`, config);
-    // You can add auth tokens here if needed
     return config;
   },
   (error) => {
@@ -89,11 +102,11 @@ const apiService = {
   
   // Time Simulation API
   simulation: {
-    simulateDays: (numOfDays, itemsToBeUsedPerDay = []) => API.post('/simulation/simulate/', {
+    simulateDays: (numOfDays, itemsToBeUsedPerDay = []) => API.post('/placement/simulate/', {
       numOfDays,
       itemsToBeUsedPerDay
     }),
-    simulateToDate: (toTimestamp, itemsToBeUsedPerDay = []) => API.post('/simulation/simulate/', {
+    simulateToDate: (toTimestamp, itemsToBeUsedPerDay = []) => API.post('/placement/simulate/', {
       toTimestamp,
       itemsToBeUsedPerDay
     }),
@@ -101,12 +114,12 @@ const apiService = {
   
   // Import/Export APIs
   data: {
-    importItems: (formData) => API.post('/upload/items/', formData, {
+    importItems: (formData) => API.post('/placement/import/items/', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
     }),
-    importContainers: (formData) => API.post('/upload/containers/', formData, {
+    importContainers: (formData) => API.post('/placement/import/containers/', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
@@ -125,9 +138,11 @@ const apiService = {
       if (itemId) params.itemId = itemId;
       if (userId) params.userId = userId;
       if (actionType) params.actionType = actionType;
-      return API.get('/placement/logs/', { params });
+      return API.get('logs/', { params });
     },
   },
 };
 
 export default apiService;
+
+export { API };

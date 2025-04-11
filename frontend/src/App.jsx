@@ -13,7 +13,7 @@ import ItemSearch from './pages/ItemSearch';
 import Rearrangement from './pages/Rearrangement';
 import WasteManagement from './pages/WasteManagement';
 import TimeSimulation from './pages/TimeSimulation';
-
+import PlacementTester from './Placement_Tester';
 // Star field background component
 const StarField = () => {
   const stars = useMemo(() => {
@@ -129,6 +129,7 @@ function App() {
               <li><NavLink to="/waste">Waste Management</NavLink></li>
               <li><NavLink to="/simulation">Time Simulation</NavLink></li>
               <li><NavLink to="/logs">Logs</NavLink></li>
+              <li><NavLink to="/placement-tester">Placement Tester</NavLink></li>
             </ul>
           </nav>
           <div className="actions">
@@ -152,6 +153,7 @@ function App() {
             <Route path="/waste" element={<WasteManagement />} />
             <Route path="/simulation" element={<TimeSimulation />} />
             <Route path="/logs" element={<Logs />} />
+            <Route path="/placement-tester" element={<PlacementTester />} />
           </Routes>
         </main>
         <footer className="app-footer">

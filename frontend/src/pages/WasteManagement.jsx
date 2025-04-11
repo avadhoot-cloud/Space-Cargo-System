@@ -26,12 +26,12 @@ const WasteManagement = () => {
           apiService.data.getContainers()
         ]);
         
-        setWasteItems(wasteResponse.data.wasteItems || []);
-        setContainers(containersResponse.data || []);
+        setWasteItems(wasteResponse.data.waste_items || []);
+        setContainers(containersResponse.data.containers || []);
         
         // Set default undocking container if available
-        if (containersResponse.data && containersResponse.data.length > 0) {
-          setUndockingContainerId(containersResponse.data[0].container_id);
+        if (containersResponse.data.containers && containersResponse.data.containers.length > 0) {
+          setUndockingContainerId(containersResponse.data.containers[0].container_id);
         }
         
         setLoading(false);
@@ -82,7 +82,7 @@ const WasteManagement = () => {
       if (response.data.success) {
         // Refresh waste items
         const wasteResponse = await apiService.waste.identify();
-        setWasteItems(wasteResponse.data.wasteItems || []);
+        setWasteItems(wasteResponse.data.waste_items || []);
         
         alert(`Successfully removed ${response.data.itemsRemoved} waste items`);
         setReturnPlan(null);

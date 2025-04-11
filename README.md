@@ -18,7 +18,7 @@ The application consists of:
 - **Backend**: Python with FastAPI, SQLAlchemy, and PostgreSQL
 - **Frontend**: React with Three.js for 3D visualization
 - **Docker**: Containerized setup for easy deployment
-
+- **Algorithms**: All the orginal algorithms are stored in the backend < src < algorithms folder. All the algorithms are implemented in Python using jupyter notebook. the algorithms are stored seperately also and combined also
 ## Getting Started
 
 ### Prerequisites

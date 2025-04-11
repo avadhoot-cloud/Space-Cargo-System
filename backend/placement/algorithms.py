@@ -37,6 +37,11 @@ class PlacementManager:
             print(f"DEBUG: Items columns: {items_df.columns.tolist()}")
             print(f"DEBUG: First few items: {items_df.head().to_dict()}")
             
+            # Check if mass_kg exists but weight_kg doesn't, and rename if needed
+            if 'mass_kg' in items_df.columns and 'weight_kg' not in items_df.columns:
+                print(f"DEBUG: Renaming mass_kg to weight_kg")
+                items_df = items_df.rename(columns={'mass_kg': 'weight_kg'})
+            
             # Ensure required columns exist
             required_item_columns = ['item_id', 'name', 'width_cm', 'height_cm', 'depth_cm', 'weight_kg']
             for col in required_item_columns:
@@ -52,12 +57,22 @@ class PlacementManager:
             print(f"DEBUG: First few containers: {containers_df.head().to_dict()}")
             
             # Ensure required columns exist
-            required_container_columns = ['container_id', 'name', 'width_cm', 'height_cm', 'depth_cm', 'max_weight_kg', 'zone']
+            required_container_columns = ['container_id', 'width_cm', 'height_cm', 'depth_cm', 'zone']
             for col in required_container_columns:
                 if col not in containers_df.columns:
                     logger.error(f"Missing required column in containers CSV: {col}")
                     print(f"DEBUG: Missing required column in containers CSV: {col}")
                     return None, None
+            
+            # Add max_weight_kg if missing
+            if 'max_weight_kg' not in containers_df.columns:
+                print(f"DEBUG: Adding max_weight_kg column with default value 1000")
+                containers_df['max_weight_kg'] = 1000
+            
+            # Add container name if missing
+            if 'name' not in containers_df.columns:
+                print(f"DEBUG: Adding name column based on container_id")
+                containers_df['name'] = containers_df['container_id'].apply(lambda x: f"Container {x}")
             
             # Calculate volumes
             items_df['volume'] = items_df['width_cm'] * items_df['height_cm'] * items_df['depth_cm']
@@ -304,7 +319,6 @@ class PlacementManager:
             # Calculate basic metrics
             total_items = len(items_df)
             print(f"DEBUG: Total items: {total_items}")
-            # print(items_df)
             placed_items = len(placements_df) if placements_df is not None else 0
             print(f"DEBUG: Placed items: {placed_items}")
             unplaced_items = total_items - placed_items
@@ -320,36 +334,59 @@ class PlacementManager:
             used_volume = 0
             container_utilization = []
             
-            if placements_df is not None:
+            if placements_df is not None and not placements_df.empty:
+                # Fix: Convert container_id to string if needed to ensure type matching
+                if 'container_id' in placements_df.columns:
+                    placements_df['container_id'] = placements_df['container_id'].astype(str)
+                
+                # Calculate the total volume used by all placed items
+                for _, item in placements_df.iterrows():
+                    item_volume = item['width_cm'] * item['depth_cm'] * item['height_cm']
+                    used_volume += item_volume
+                    print(f"DEBUG: Added item volume: {item_volume}, total used volume now: {used_volume}")
+                
+                # Process each container
                 for _, container in containers_df.iterrows():
-                    container_id = container['container_id']
+                    container_id = str(container['container_id'])
                     container_volume = container['volume']
                     print(f"DEBUG: Processing container {container_id} with volume {container_volume}")
                     
                     # Find items in this container
-                    container_items = placements_df[placements_df['container_id'] == container_id]
+                    container_items = placements_df[placements_df['container_id'].astype(str) == container_id]
                     print(f"DEBUG: Container {container_id} has {len(container_items)} items")
                     
                     # Calculate volume used in this container
                     container_used_volume = 0
                     for _, item in container_items.iterrows():
-                        item_volume = item['width_cm'] * item['height_cm'] * item['depth_cm']
+                        item_volume = item['width_cm'] * item['depth_cm'] * item['height_cm']
                         container_used_volume += item_volume
-                    
-                    used_volume += container_used_volume
-                    print(f"DEBUG: Container {container_id} used volume: {container_used_volume}")
+                        print(f"DEBUG: Item volume: {item_volume}, container used volume now: {container_used_volume}")
                     
                     # Calculate utilization for this container
                     container_util = (container_used_volume / container_volume * 100) if container_volume > 0 else 0
+                    print(f"DEBUG: Container {container_id} used volume: {container_used_volume}")
                     print(f"DEBUG: Container {container_id} utilization: {container_util}%")
                     
                     container_utilization.append({
                         "container_id": container_id,
-                        "name": container['name'],
+                        "name": container.get('name', f"Container {container_id}"),
                         "zone": container['zone'],
                         "volume_cm3": float(container_volume),
                         "used_volume_cm3": float(container_used_volume),
                         "utilization_percent": float(container_util)
+                    })
+            else:
+                # If no placements, set all containers to 0 utilization
+                for _, container in containers_df.iterrows():
+                    container_id = str(container['container_id'])
+                    container_volume = container['volume']
+                    container_utilization.append({
+                        "container_id": container_id,
+                        "name": container.get('name', f"Container {container_id}"),
+                        "zone": container['zone'],
+                        "volume_cm3": float(container_volume),
+                        "used_volume_cm3": 0.0,
+                        "utilization_percent": 0.0
                     })
             
             # Calculate overall volume utilization
@@ -384,26 +421,40 @@ class PlacementManager:
     
     def load_results(self):
         """Load placement results from CSV files."""
+        # Check both possible filenames for placements
         placed_path = self.data_dir / 'placed_items.csv'
+        alt_placed_path = self.data_dir / 'placement_results.csv'
         unplaced_path = self.data_dir / 'unplaced_items.csv'
         
-        print(f"DEBUG: Looking for placed items at {placed_path}")
+        print(f"DEBUG: Looking for placed items at {placed_path} or {alt_placed_path}")
         print(f"DEBUG: Looking for unplaced items at {unplaced_path}")
         
         placements_df = None
         unplaced_df = None
         
+        # First try the original filename
         if placed_path.exists():
             try:
                 placements_df = pd.read_csv(placed_path)
-                print(f"DEBUG: Loaded placed items: {len(placements_df)} items")
+                print(f"DEBUG: Loaded placed items from {placed_path}: {len(placements_df)} items")
                 print(f"DEBUG: Placed items columns: {placements_df.columns.tolist()}")
                 print(f"DEBUG: First few placed items: {placements_df.head().to_dict()}")
             except Exception as e:
-                logger.error(f"Error loading placed items: {str(e)}")
-                print(f"DEBUG: Error loading placed items: {str(e)}")
+                logger.error(f"Error loading placed items from {placed_path}: {str(e)}")
+                print(f"DEBUG: Error loading placed items from {placed_path}: {str(e)}")
+        
+        # If not found, try the alternative filename
+        elif alt_placed_path.exists():
+            try:
+                placements_df = pd.read_csv(alt_placed_path)
+                print(f"DEBUG: Loaded placed items from {alt_placed_path}: {len(placements_df)} items")
+                print(f"DEBUG: Placed items columns: {placements_df.columns.tolist()}")
+                print(f"DEBUG: First few placed items: {placements_df.head().to_dict()}")
+            except Exception as e:
+                logger.error(f"Error loading placed items from {alt_placed_path}: {str(e)}")
+                print(f"DEBUG: Error loading placed items from {alt_placed_path}: {str(e)}")
         else:
-            print(f"DEBUG: Placed items file not found at {placed_path}")
+            print(f"DEBUG: Placed items file not found at {placed_path} or {alt_placed_path}")
         
         if unplaced_path.exists():
             try:
@@ -503,14 +554,29 @@ class PlacementManager:
     
     def identify_waste(self):
         """Identify expired items and items with zero uses left."""
+        print("DEBUG: identify_waste called")
         items_df, _ = self.load_from_csv()
-        placements_df, _ = self.load_results()
+        
+        # Try to load placement data directly from CSV files
+        placed_path = self.data_dir / 'placed_items.csv'
+        print(f"DEBUG: Looking for placed items at {placed_path}")
+        
+        placements_df = None
+        if placed_path.exists():
+            try:
+                placements_df = pd.read_csv(placed_path)
+                print(f"DEBUG: Loaded placed items: {len(placements_df)} items")
+            except Exception as e:
+                print(f"DEBUG: Error loading placed items: {str(e)}")
+                logger.error(f"Error loading placed items: {str(e)}")
         
         if items_df is None or placements_df is None:
+            print("DEBUG: No items or placements data found")
             return []
         
         waste_items = []
         today = datetime.now().date()
+        print(f"DEBUG: Today's date: {today}")
         
         for _, item in items_df.iterrows():
             item_id = item['item_id']
@@ -521,54 +587,48 @@ class PlacementManager:
                 container_id = placement['container_id']
                 position = (placement['x_cm'], placement['y_cm'], placement['z_cm'])
                 
+                should_add = False
+                reason = ""
+                
                 # Check expiry date if column exists
                 if 'expiry_date' in items_df.columns and pd.notna(item.get('expiry_date')):
                     try:
                         expiry_date = pd.to_datetime(item['expiry_date']).date()
+                        print(f"DEBUG: Item {item_id} expiry date: {expiry_date}")
                         if expiry_date <= today:
-                            waste_items.append({
-                                "item_id": item_id,
-                                "name": item['name'],
-                                "reason": "Expired",
-                                "containerId": container_id,
-                                "position": {
-                                    "startCoordinates": {
-                                        "width": position[0],
-                                        "depth": position[1],
-                                        "height": position[2]
-                                    },
-                                    "endCoordinates": {
-                                        "width": position[0] + item['width_cm'],
-                                        "depth": position[1] + item['depth_cm'],
-                                        "height": position[2] + item['height_cm']
-                                    }
-                                }
-                            })
-                    except:
-                        pass
+                            should_add = True
+                            reason = "Expired"
+                    except Exception as e:
+                        print(f"DEBUG: Error processing expiry date for item {item_id}: {str(e)}")
                 
                 # Check usage limit if column exists
                 if 'usage_limit' in items_df.columns and pd.notna(item.get('usage_limit')):
                     if int(item['usage_limit']) <= 0:
-                        waste_items.append({
-                            "item_id": item_id,
-                            "name": item['name'],
-                            "reason": "Out of Uses",
-                            "containerId": container_id,
-                            "position": {
-                                "startCoordinates": {
-                                    "width": position[0],
-                                    "depth": position[1],
-                                    "height": position[2]
-                                },
-                                "endCoordinates": {
-                                    "width": position[0] + item['width_cm'],
-                                    "depth": position[1] + item['depth_cm'],
-                                    "height": position[2] + item['height_cm']
-                                }
+                        should_add = True
+                        reason = "Out of Uses"
+                
+                if should_add:
+                    print(f"DEBUG: Adding item {item_id} as waste with reason: {reason}")
+                    waste_items.append({
+                        "item_id": item_id,
+                        "name": item['name'],
+                        "reason": reason,
+                        "containerId": container_id,
+                        "position": {
+                            "startCoordinates": {
+                                "width": position[0],
+                                "depth": position[1],
+                                "height": position[2]
+                            },
+                            "endCoordinates": {
+                                "width": position[0] + item['width_cm'],
+                                "depth": position[1] + item['depth_cm'],
+                                "height": position[2] + item['height_cm']
                             }
-                        })
+                        }
+                    })
         
+        print(f"DEBUG: Found {len(waste_items)} waste items")
         return waste_items
     
     def simulate_days(self, num_days, items_to_use=None):
@@ -707,3 +767,77 @@ class PlacementManager:
         except Exception as e:
             logger.error(f"Error loading logs: {str(e)}")
             return []
+    
+    def load_containers(self):
+        """Load containers data from CSV."""
+        try:
+            containers_path = self.data_dir / 'containers.csv'
+            
+            if not containers_path.exists():
+                logger.warning(f"Containers file not found: {containers_path}")
+                print(f"DEBUG: Containers file not found: {containers_path}")
+                return None
+            
+            containers_df = pd.read_csv(containers_path)
+            print(f"DEBUG: Loaded containers: {len(containers_df)} containers")
+            
+            return containers_df
+        except Exception as e:
+            logger.error(f"Error loading containers: {str(e)}")
+            print(f"DEBUG: Error loading containers: {str(e)}")
+            return None
+    
+    def load_items(self):
+        """Load items data from CSV."""
+        try:
+            items_path = self.data_dir / 'input_items.csv'
+            
+            if not items_path.exists():
+                logger.warning(f"Items file not found: {items_path}")
+                print(f"DEBUG: Items file not found: {items_path}")
+                return None
+            
+            items_df = pd.read_csv(items_path)
+            print(f"DEBUG: Loaded items: {len(items_df)} items")
+            
+            return items_df
+        except Exception as e:
+            logger.error(f"Error loading items: {str(e)}")
+            print(f"DEBUG: Error loading items: {str(e)}")
+            return None
+    
+    def load_placement(self):
+        """Load placement data from CSV."""
+        try:
+            # Check both possible filenames for placements
+            placed_path = self.data_dir / 'placed_items.csv'
+            alt_placed_path = self.data_dir / 'placement_results.csv'
+            
+            print(f"DEBUG: Looking for placed items at {placed_path} or {alt_placed_path}")
+            
+            # First try the original filename
+            if placed_path.exists():
+                try:
+                    placements_df = pd.read_csv(placed_path)
+                    print(f"DEBUG: Loaded placed items from {placed_path}: {len(placements_df)} items")
+                    return placements_df
+                except Exception as e:
+                    logger.error(f"Error loading placed items from {placed_path}: {str(e)}")
+                    print(f"DEBUG: Error loading placed items from {placed_path}: {str(e)}")
+            
+            # If not found, try the alternative filename
+            elif alt_placed_path.exists():
+                try:
+                    placements_df = pd.read_csv(alt_placed_path)
+                    print(f"DEBUG: Loaded placed items from {alt_placed_path}: {len(placements_df)} items")
+                    return placements_df
+                except Exception as e:
+                    logger.error(f"Error loading placed items from {alt_placed_path}: {str(e)}")
+                    print(f"DEBUG: Error loading placed items from {alt_placed_path}: {str(e)}")
+            else:
+                print(f"DEBUG: Placed items file not found at {placed_path} or {alt_placed_path}")
+                return None
+        except Exception as e:
+            logger.error(f"Error loading placement: {str(e)}")
+            print(f"DEBUG: Error loading placement: {str(e)}")
+            return None

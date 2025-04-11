@@ -10,6 +10,7 @@ from .serializers import (
     PlacementRecommendationSerializer
 )
 from .algorithms import PlacementManager
+import pandas as pd
 
 # Model ViewSets for basic CRUD operations
 class ContainerViewSet(viewsets.ModelViewSet):
@@ -62,24 +63,183 @@ def process_data(request):
 # API view for getting placement recommendations for unplaced items
 @api_view(['GET'])
 def get_recommendations(request):
+    print("DEBUG: get_recommendations called")
     manager = PlacementManager()
-    recommendations = manager.get_recommendations()
-    if not recommendations:
-        # If no recommendations, try to generate them from unplaced items
-        _, unplaced_df = manager.load_results()
-        if unplaced_df is not None and not unplaced_df.empty:
-            recommendations = manager.get_recommendations()
-    serializer = PlacementRecommendationSerializer(recommendations, many=True)
-    return Response(serializer.data)
+    
+    # First try to load data from CSV files
+    items_df, containers_df = manager.load_from_csv()
+    
+    if items_df is None or containers_df is None:
+        print("DEBUG: No data found")
+        return Response({
+            'success': False,
+            'message': 'No data found'
+        })
+    
+    # Try to load results directly from CSV files
+    try:
+        placed_path = manager.data_dir / 'placed_items.csv'
+        unplaced_path = manager.data_dir / 'unplaced_items.csv'
+        
+        print(f"DEBUG: Looking for placement files at {placed_path} and {unplaced_path}")
+        
+        placements_df = None
+        unplaced_df = None
+        
+        if placed_path.exists():
+            try:
+                placements_df = pd.read_csv(placed_path)
+                print(f"DEBUG: Loaded placed items: {len(placements_df)} items")
+            except Exception as e:
+                print(f"DEBUG: Error loading placed items: {str(e)}")
+        else:
+            print(f"DEBUG: Placed items file not found at {placed_path}")
+            
+        if unplaced_path.exists():
+            try:
+                unplaced_df = pd.read_csv(unplaced_path)
+                print(f"DEBUG: Loaded unplaced items: {len(unplaced_df)} items")
+            except Exception as e:
+                print(f"DEBUG: Error loading unplaced items: {str(e)}")
+        else:
+            print(f"DEBUG: Unplaced items file not found at {unplaced_path}")
+    except Exception as e:
+        print(f"DEBUG: Error loading placement data: {str(e)}")
+        return Response({
+            'success': False,
+            'message': f'Error loading placement data: {str(e)}'
+        })
+    
+    # If no unplaced items found, return empty list
+    if unplaced_df is None or unplaced_df.empty:
+        print("DEBUG: No unplaced items found")
+        return Response([])
+    
+    # Calculate recommendations
+    recommendations = []
+    print(f"DEBUG: Calculating recommendations for {len(unplaced_df)} unplaced items")
+    
+    for _, item in unplaced_df.iterrows():
+        item_id = item['item_id']
+        item_volume = item['width_cm'] * item['depth_cm'] * item['height_cm']
+        preferred_zone = item.get('preferred_zone')
+        
+        # First try preferred zone
+        best_container_id = None
+        best_utilization = float('inf')
+        best_reasoning = ""
+        zone_match = False
+        
+        # Filter containers that can fit the item
+        valid_containers = []
+        
+        for _, container in containers_df.iterrows():
+            container_id = container['container_id']
+            container_volume = container['volume']
+            container_zone = container['zone']
+            
+            # Calculate current utilization
+            current_utilization = 0
+            if placements_df is not None:
+                container_placements = placements_df[placements_df['container_id'] == container_id]
+                for _, placement in container_placements.iterrows():
+                    current_utilization += placement['width_cm'] * placement['depth_cm'] * placement['height_cm']
+            
+            remaining_volume = container_volume - current_utilization
+            
+            if remaining_volume >= item_volume:
+                valid_containers.append({
+                    'container_id': container_id,
+                    'container_name': container.get('name', f"Container {container_id}"),
+                    'zone': container_zone,
+                    'remaining_volume': remaining_volume,
+                    'utilization': current_utilization / container_volume if container_volume > 0 else 0
+                })
+        
+        # Find best container
+        if valid_containers:
+            # First try preferred zone
+            preferred_containers = [c for c in valid_containers if c['zone'] == preferred_zone]
+            
+            if preferred_containers:
+                # Sort by utilization (choose one with highest utilization to maximize space efficiency)
+                preferred_containers.sort(key=lambda x: x['utilization'], reverse=True)
+                best_container = preferred_containers[0]
+                best_container_id = best_container['container_id']
+                best_reasoning = f"Container is in the preferred zone ({preferred_zone})"
+                zone_match = True
+            else:
+                # Sort all containers by remaining volume (choose smallest that can fit)
+                valid_containers.sort(key=lambda x: x['remaining_volume'])
+                best_container = valid_containers[0]
+                best_container_id = best_container['container_id']
+                best_reasoning = f"No containers available in preferred zone ({preferred_zone}). Selected container in zone {best_container['zone']} with sufficient space."
+        
+        if best_container_id:
+            score = 100 if zone_match else 70
+            recommendations.append({
+                "item_id": item_id,
+                "item_name": item['name'],
+                "container_id": best_container_id,
+                "container_name": next((c['container_name'] for c in valid_containers if c['container_id'] == best_container_id), ""),
+                "reasoning": best_reasoning,
+                "score": score
+            })
+    
+    # Sort recommendations by score
+    recommendations.sort(key=lambda x: x["score"], reverse=True)
+    print(f"DEBUG: Generated {len(recommendations)} recommendations")
+    
+    return Response(recommendations)
 
 # API view to retrieve placement results from CSV files
 @api_view(['GET'])
 def get_results(request):
+    print("DEBUG: get_results called")
     manager = PlacementManager()
-    placements_df, unplaced_df = manager.load_results()
     
-    # If no results found, try to process the data
+    # The error is here - load_results is in the class but views.py is trying to use it incorrectly
+    print("DEBUG: Loading placement results")
+    items_df, containers_df = manager.load_from_csv()
+    
+    try:
+        # Try to load results directly from CSV files
+        placed_path = manager.data_dir / 'placed_items.csv'
+        unplaced_path = manager.data_dir / 'unplaced_items.csv'
+        
+        print(f"DEBUG: Looking for placement files at {placed_path} and {unplaced_path}")
+        
+        placements_df = None
+        unplaced_df = None
+        
+        if placed_path.exists():
+            try:
+                placements_df = pd.read_csv(placed_path)
+                print(f"DEBUG: Loaded placed items: {len(placements_df)} items")
+            except Exception as e:
+                print(f"DEBUG: Error loading placed items: {str(e)}")
+        else:
+            print(f"DEBUG: Placed items file not found at {placed_path}")
+            
+        if unplaced_path.exists():
+            try:
+                unplaced_df = pd.read_csv(unplaced_path)
+                print(f"DEBUG: Loaded unplaced items: {len(unplaced_df)} items")
+            except Exception as e:
+                print(f"DEBUG: Error loading unplaced items: {str(e)}")
+        else:
+            print(f"DEBUG: Unplaced items file not found at {unplaced_path}")
+    
+    except Exception as e:
+        print(f"DEBUG: Error in get_results: {str(e)}")
+        return Response({
+            'success': False,
+            'message': f'Error loading results: {str(e)}'
+        })
+    
+    # If no results found or loading failed, try to process the data
     if placements_df is None or unplaced_df is None:
+        print("DEBUG: No placement results found, trying to process data")
         items_df, containers_df = manager.load_from_csv()
         if items_df is not None and containers_df is not None:
             placements_df, unplaced_df = manager.place_items(items_df, containers_df)
@@ -89,24 +249,28 @@ def get_results(request):
     unplaced = unplaced_df.to_dict(orient='records') if unplaced_df is not None else []
     
     # Load items and containers data
-    items_df, containers_df = manager.load_from_csv()
     items = items_df.to_dict(orient='records') if items_df is not None else []
     containers = containers_df.to_dict(orient='records') if containers_df is not None else []
     
     # Calculate container utilization
     container_utilization = {}
-    for container in containers:
-        container_items = [p for p in placements if p['container_id'] == container['container_id']]
-        used_volume = sum(item['width_cm'] * item['height_cm'] * item['depth_cm'] for item in container_items)
-        total_volume = container['width_cm'] * container['height_cm'] * container['depth_cm']
-        utilization = (used_volume / total_volume * 100) if total_volume > 0 else 0
-        
-        container_utilization[container['container_id']] = {
-            'utilization': round(utilization, 2),
-            'used_volume': round(used_volume, 2),
-            'total_volume': round(total_volume, 2)
-        }
+    try:
+        for container in containers:
+            container_id = container['container_id']
+            container_items = [p for p in placements if p['container_id'] == container_id]
+            used_volume = sum(item['width_cm'] * item['height_cm'] * item['depth_cm'] for item in container_items)
+            total_volume = container['width_cm'] * container['height_cm'] * container['depth_cm']
+            utilization = (used_volume / total_volume * 100) if total_volume > 0 else 0
+            
+            container_utilization[container_id] = {
+                'utilization': round(utilization, 2),
+                'used_volume': round(used_volume, 2),
+                'total_volume': round(total_volume, 2)
+            }
+    except Exception as e:
+        print(f"DEBUG: Error calculating utilization: {str(e)}")
     
+    print("DEBUG: Successfully processed results")
     return Response({
         'success': True,
         'placed_items': placements,
@@ -168,11 +332,29 @@ def search_item(request):
     
     # Get placement information
     print("DEBUG: Loading placement results")
-    placements_df, _ = manager.load_results()
-    placement = None
-    if placements_df is not None:
-        placement = placements_df[placements_df['item_id'] == item.iloc[0]['item_id']]
-        print(f"DEBUG: Placement found: {not placement.empty}")
+    try:
+        # Try to load results directly from CSV files
+        placed_path = manager.data_dir / 'placed_items.csv'
+        print(f"DEBUG: Looking for placement file at {placed_path}")
+        
+        placements_df = None
+        
+        if placed_path.exists():
+            try:
+                placements_df = pd.read_csv(placed_path)
+                print(f"DEBUG: Loaded placed items: {len(placements_df)} items")
+            except Exception as e:
+                print(f"DEBUG: Error loading placed items: {str(e)}")
+        else:
+            print(f"DEBUG: Placed items file not found at {placed_path}")
+            
+        placement = None
+        if placements_df is not None:
+            placement = placements_df[placements_df['item_id'] == item.iloc[0]['item_id']]
+            print(f"DEBUG: Placement found: {not placement.empty if not placement.empty else False}")
+    except Exception as e:
+        print(f"DEBUG: Error loading placement data: {str(e)}")
+        placement = None
     
     # Format response
     item_data = item.iloc[0].to_dict()
@@ -217,7 +399,28 @@ def retrieve_item(request):
     manager = PlacementManager()
     print("DEBUG: Loading items and placements")
     items_df, _ = manager.load_from_csv()
-    placements_df, _ = manager.load_results()
+    
+    try:
+        # Try to load results directly from CSV files
+        placed_path = manager.data_dir / 'placed_items.csv'
+        print(f"DEBUG: Looking for placement file at {placed_path}")
+        
+        placements_df = None
+        
+        if placed_path.exists():
+            try:
+                placements_df = pd.read_csv(placed_path)
+                print(f"DEBUG: Loaded placed items: {len(placements_df)} items")
+            except Exception as e:
+                print(f"DEBUG: Error loading placed items: {str(e)}")
+        else:
+            print(f"DEBUG: Placed items file not found at {placed_path}")
+    except Exception as e:
+        print(f"DEBUG: Error loading placement data: {str(e)}")
+        return Response({
+            'success': False,
+            'message': f'Error loading placement data: {str(e)}'
+        })
     
     if items_df is None or placements_df is None:
         print("DEBUG: No data found")
@@ -257,12 +460,28 @@ def retrieve_item(request):
 # Dummy view for waste identification (to be implemented)
 @api_view(['GET'])
 def identify_waste(request):
+    """Identify expired items or items with zero uses left."""
+    print("DEBUG: identify_waste view called")
     manager = PlacementManager()
-    waste_items = manager.identify_waste()
-    return Response({
-        'success': True,
-        'waste_items': waste_items
-    })
+    
+    try:
+        waste_items = manager.identify_waste()
+        print(f"DEBUG: Retrieved {len(waste_items)} waste items")
+        return Response({
+            'success': True,
+            'waste_items': waste_items,
+            'wasteItems': waste_items  # Add camelCase version for compatibility
+        })
+    except Exception as e:
+        print(f"DEBUG: Error in identify_waste view: {str(e)}")
+        import traceback
+        print(f"DEBUG: Traceback: {traceback.format_exc()}")
+        return Response({
+            'success': False,
+            'message': f"Error identifying waste items: {str(e)}",
+            'waste_items': [],
+            'wasteItems': []  # Add camelCase version for compatibility
+        })
 
 # Dummy view for returning undocking plan (to be implemented)
 @api_view(['POST'])
@@ -346,7 +565,8 @@ def get_containers(request):
     containers = containers_df.to_dict(orient='records') if containers_df is not None else []
     return Response({
         'success': True,
-        'containers': containers
+        'containers': containers,
+        'containersData': containers  # Add camelCase version for compatibility
     })
 
 @api_view(['GET'])
@@ -378,3 +598,31 @@ def get_placement(request):
         'success': True,
         'placement': placement
     })
+
+
+
+# backend/placement/views.py
+
+import json
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+
+@csrf_exempt
+def placement_view(request):
+    """
+    This view handles POST requests to the placement endpoint.
+    It expects JSON with 'items' and 'containers' keys.
+    On success, it returns {"success": true}.
+    """
+    if request.method == "POST":
+        try:
+            data = json.loads(request.body)
+            # Check if both 'items' and 'containers' keys are present
+            if "items" in data and "containers" in data:
+                return JsonResponse({"success": True})
+            else:
+                return JsonResponse({"success": False, "error": "Missing required keys"}, status=400)
+        except json.JSONDecodeError:
+            return JsonResponse({"success": False, "error": "Invalid JSON"}, status=400)
+    else:
+        return JsonResponse({"success": False, "error": "Only POST method is allowed"}, status=405)

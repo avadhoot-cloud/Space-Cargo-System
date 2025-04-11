@@ -3,6 +3,7 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from . import views
+from .views import placement_view
 
 router = DefaultRouter()
 router.register('containers', views.ContainerViewSet)
@@ -10,9 +11,8 @@ router.register('items', views.ItemViewSet)
 
 urlpatterns = [
     path('', include(router.urls)),
-    
     # Placement APIs
-    path('placement/', views.get_placement, name='get_placement'),
+    path('api/placement', placement_view, name='placement'),
     path('statistics/', views.get_placement_stats, name='get_placement_stats'),
     path('process/', views.process_data, name='process_data'),
     path('results/', views.get_results, name='get_results'),
