@@ -16,7 +16,7 @@ WORKDIR /app
 # Copy backend requirements and install them
 COPY backend/requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
-RUN pip3 install django
+RUN pip3 install django gunicorn
 
 # Copy the backend application code into the container
 COPY backend/ .
@@ -27,8 +27,8 @@ RUN mkdir -p /data
 # Expose port 8000 so that the backend can be reached
 EXPOSE 8000
 
-# Make sure the migrations are applied
+# Pre-apply migrations during build
 RUN python3 manage.py migrate --noinput || true
 
-# Run the Django server without the file reloader (--noreload) to start faster
-CMD ["python3", "manage.py", "runserver", "--noreload", "0.0.0.0:8000"]
+# Use Gunicorn instead of Django's development server for faster startup
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--timeout", "30", "--workers", "2", "spacecargo.wsgi:application"]
