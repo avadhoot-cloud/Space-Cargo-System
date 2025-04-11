@@ -1,34 +1,34 @@
-# Use Ubuntu 22.04 as the base image
-FROM ubuntu:22.04
+# Use Python slim image for faster startup
+FROM python:3.9-slim
 
 # Avoid interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Install Python, pip, and git (if needed)
-RUN apt-get update && \
-    apt-get install -y python3 python3-pip git && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+# Set Python to run in unbuffered mode
+ENV PYTHONUNBUFFERED=1 
+ENV PYTHONDONTWRITEBYTECODE=1
 
 # Set working directory
 WORKDIR /app
 
-# Copy backend requirements and install them
+# Copy requirements and install them
 COPY backend/requirements.txt .
-RUN pip3 install --no-cache-dir -r requirements.txt
-RUN pip3 install django gunicorn
+RUN pip install --no-cache-dir -r requirements.txt gunicorn
 
-# Copy the backend application code into the container
+# Copy the backend application code
 COPY backend/ .
 
 # Create a directory for persistent data
 RUN mkdir -p /data
 
-# Expose port 8000 so that the backend can be reached
+# Pre-compile Python files to bytecode for faster startup
+RUN python -m compileall .
+
+# Expose port 8000
 EXPOSE 8000
 
-# Pre-apply migrations during build
-RUN python3 manage.py migrate --noinput || true
+# Set up a minimal health check endpoint for faster response
+RUN echo 'from django.http import HttpResponse; def health(request): return HttpResponse("OK")' > healthcheck.py
 
-# Use Gunicorn instead of Django's development server for faster startup
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--timeout", "30", "--workers", "2", "spacecargo.wsgi:application"]
+# Use Gunicorn with minimal configuration for fastest startup
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "1", "--threads", "2", "--preload", "--timeout", "5", "spacecargo.wsgi:application"]
