@@ -7,26 +7,58 @@ def application(environ, start_response):
     
     # Handle different routes
     if environ['PATH_INFO'] == '/api/placement' and environ['REQUEST_METHOD'] == 'POST':
-        # Read request body
-        try:
-            request_body_size = int(environ.get('CONTENT_LENGTH', 0))
-        except ValueError:
-            request_body_size = 0
-            
-        # Get request data (but we don't need to parse it for this mock)
-        request_body = environ['wsgi.input'].read(request_body_size)
-        
-        # Mock successful placement response
+        # Mock response with dummy data
         response = {
             "success": True,
-            "message": "Items placed successfully",
             "placements": [
                 {
                     "itemId": "test-item-1",
                     "containerId": "test-container-1",
-                    "x": 0,
-                    "y": 0,
-                    "z": 0
+                    "position": {
+                        "startCoordinates": {
+                            "width": 0,
+                            "depth": 0,
+                            "height": 0
+                        },
+                        "endCoordinates": {
+                            "width": 10,
+                            "depth": 10,
+                            "height": 10
+                        }
+                    }
+                }
+            ],
+            "rearrangements": [
+                {
+                    "step": 1,
+                    "action": "move",
+                    "itemId": "test-item-1",
+                    "fromContainer": "test-container-0",
+                    "fromPosition": {
+                        "startCoordinates": {
+                            "width": 5,
+                            "depth": 5,
+                            "height": 5
+                        },
+                        "endCoordinates": {
+                            "width": 15,
+                            "depth": 15,
+                            "height": 15
+                        }
+                    },
+                    "toContainer": "test-container-1",
+                    "toPosition": {
+                        "startCoordinates": {
+                            "width": 0,
+                            "depth": 0,
+                            "height": 0
+                        },
+                        "endCoordinates": {
+                            "width": 10,
+                            "depth": 10,
+                            "height": 10
+                        }
+                    }
                 }
             ]
         }
@@ -36,5 +68,3 @@ def application(environ, start_response):
         # Default health check response
         start_response(status, headers)
         return [b'{"status":"online"}']
-
-# This is a standalone WSGI app that responds immediately without Django 

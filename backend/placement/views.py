@@ -607,22 +607,81 @@ import json
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 
+# views.py (updated placement_view)
 @csrf_exempt
 def placement_view(request):
-    """
-    This view handles POST requests to the placement endpoint.
-    It expects JSON with 'items' and 'containers' keys.
-    On success, it returns {"success": true}.
-    """
     if request.method == "POST":
         try:
             data = json.loads(request.body)
-            # Check if both 'items' and 'containers' keys are present
-            if "items" in data and "containers" in data:
-                return JsonResponse({"success": True})
-            else:
+            if "items" not in data or "containers" not in data:
                 return JsonResponse({"success": False, "error": "Missing required keys"}, status=400)
+            
+            # Process items and containers into DataFrames
+            items_data = data['items']
+            containers_data = data['containers']
+            
+            # Convert input keys to DataFrame columns (camelCase to snake_case)
+            for item in items_data:
+                item['item_id'] = item.pop('itemId')
+                item['width_cm'] = item.pop('width')
+                item['depth_cm'] = item.pop('depth')
+                item['height_cm'] = item.pop('height')
+                item['preferred_zone'] = item.get('preferredZone', '')
+            
+            for container in containers_data:
+                container['container_id'] = container.pop('containerId')
+                container['width_cm'] = container.pop('width')
+                container['depth_cm'] = container.pop('depth')
+                container['height_cm'] = container.pop('height')
+                container['zone'] = container.get('zone', '')
+                container['volume'] = container['width_cm'] * container['depth_cm'] * container['height_cm']
+                container['name'] = container.get('name', f"Container {container['container_id']}")
+            
+            items_df = pd.DataFrame(items_data)
+            containers_df = pd.DataFrame(containers_data)
+            
+            manager = PlacementManager()
+            placements_df, unplaced_df = manager.place_items(items_df, containers_df)
+            
+            # Format placements
+            placements = []
+            if placements_df is not None and not placements_df.empty:
+                for _, row in placements_df.iterrows():
+                    start_width = row['x_cm']
+                    start_depth = row['y_cm']
+                    start_height = row['z_cm']
+                    
+                    end_width = start_width + row['width_cm']
+                    end_depth = start_depth + row['depth_cm']
+                    end_height = start_height + row['height_cm']
+                    
+                    placements.append({
+                        "itemId": row['item_id'],
+                        "containerId": row['container_id'],
+                        "position": {
+                            "startCoordinates": {
+                                "width": start_width,
+                                "depth": start_depth,
+                                "height": start_height
+                            },
+                            "endCoordinates": {
+                                "width": end_width,
+                                "depth": end_depth,
+                                "height": end_height
+                            }
+                        }
+                    })
+            
+            # Return response with empty rearrangements (not implemented)
+            return JsonResponse({
+                "success": True,
+                "placements": placements,
+                "rearrangements": []
+            })
+            
         except json.JSONDecodeError:
             return JsonResponse({"success": False, "error": "Invalid JSON"}, status=400)
+        except Exception as e:
+            return JsonResponse({"success": False, "error": str(e)}, status=500)
     else:
         return JsonResponse({"success": False, "error": "Only POST method is allowed"}, status=405)
